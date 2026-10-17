@@ -157,32 +157,58 @@ export interface CityEventList {
   source: string;
   events: {
     title: string;
-    venue: string;
+    venue: string | null;
     start: string;
+    /** Last day of multi-day events (exhibitions, fairs). */
     end: string | null;
-    category: string;
+    /** No start time given: show the date only. */
+    allDay: boolean;
+    category: string | null;
     price: string | null;
     url: string | null;
   }[];
   updatedAt: string;
 }
 
+export interface Party {
+  title: string;
+  start: string;
+  /** Last day for multi-day events (festivals); null for a single evening. */
+  end: string | null;
+  /** No time given: show dates only. */
+  allDay: boolean;
+  location: string | null;
+  host: string | null;
+  bring: string | null;
+  dressCode: string | null;
+}
+
 export interface PartyList {
-  parties: { title: string; host: string; start: string; location: string; bring: string | null; dressCode: string | null }[];
+  parties: Party[];
   updatedAt: string;
 }
 
+/** A usual household item; `needed` puts it on the next supermarket trip, `quantity` (≥ 1) is how many. */
 export interface ShoppingItem {
   id: string;
   name: string;
-  quantity: string | null;
-  done: boolean;
+  quantity: number;
+  needed: boolean;
   addedAt: string;
+  neededSince: string | null;
 }
 
 export interface ShoppingList {
   items: ShoppingItem[];
+  neededCount: number;
+  whatsAppNumberSet: boolean;
   updatedAt: string;
+}
+
+export interface WhatsAppMessage {
+  url: string;
+  text: string;
+  itemCount: number;
 }
 
 export interface Photo {

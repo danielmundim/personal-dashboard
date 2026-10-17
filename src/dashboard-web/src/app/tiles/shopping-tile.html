@@ -1,0 +1,76 @@
+<app-tile title="Lista de compras" icon="cart" accent="green" [state]="state()" [meta]="meta()">
+  <section class="trip">
+    <h3>Próxima compra</h3>
+    @if (trip().length) {
+      <ul>
+        @for (item of trip(); track item.id) {
+          <li>
+            <span class="name">{{ item.name }}</span>
+            <span class="stepper" role="group" [attr.aria-label]="'Quantidade de ' + item.name">
+              <button type="button" (click)="step(item, -1)" [disabled]="item.quantity <= 1" aria-label="Diminuir">−</button>
+              <span class="count num" aria-live="polite">{{ item.quantity }}</span>
+              <button type="button" (click)="step(item, 1)" [disabled]="item.quantity >= 99" aria-label="Aumentar">+</button>
+            </span>
+            <button type="button" class="remove" (click)="toggle(item)" [attr.aria-label]="'Tirar ' + item.name + ' da lista'">
+              <app-icon name="x" [size]="14" />
+            </button>
+          </li>
+        }
+      </ul>
+    } @else {
+      <p class="empty muted">Nada em falta. Toque nos itens da casa abaixo quando algo acabar.</p>
+    }
+
+    <div class="actions">
+      <button type="button" class="whatsapp" (click)="sendToWhatsApp()" [disabled]="!trip().length || sending()">
+        <app-icon name="send" [size]="16" />{{ sending() ? 'Abrindo…' : 'Enviar para WhatsApp' }}
+      </button>
+      @if (trip().length) {
+        <button type="button" class="done" (click)="clearTrip()"><app-icon name="check" [size]="15" />Compras feitas</button>
+      }
+    </div>
+  </section>
+
+  <section class="household">
+    <div class="household-head">
+      <h3>Itens da casa</h3>
+      <button type="button" class="edit" [class.on]="editing()" (click)="editing.set(!editing())"
+              [attr.aria-pressed]="editing()" [title]="editing() ? 'Concluir edição' : 'Editar itens da casa'">
+        <app-icon [name]="editing() ? 'check' : 'pencil'" [size]="14" />{{ editing() ? 'Concluir' : 'Editar' }}
+      </button>
+    </div>
+
+    <form class="add" (submit)="add($event, name)">
+      <input #name type="text" placeholder="Procurar ou adicionar item…" maxlength="100" autocomplete="off"
+             aria-label="Procurar ou adicionar item" (input)="onInput($event)" />
+      <button type="submit" aria-label="Adicionar aos itens da casa" [disabled]="!isNew()">
+        <app-icon name="plus" [size]="18" />
+      </button>
+    </form>
+    @if (isNew()) {
+      <small class="hint muted">Enter adiciona "{{ query().trim() }}" aos itens da casa.</small>
+    }
+
+    <div class="chips" [class.editing]="editing()">
+      @for (item of chips(); track item.id) {
+        <button type="button" class="chip-item" [class.needed]="item.needed" (click)="toggle(item)"
+                [attr.aria-pressed]="item.needed">
+          {{ item.name }}
+          @if (editing()) {
+            <span class="del" role="button" tabindex="0" [attr.aria-label]="'Remover ' + item.name"
+                  (click)="$event.stopPropagation(); removeFromHousehold(item)"
+                  (keydown.enter)="$event.stopPropagation(); removeFromHousehold(item)">
+              <app-icon name="x" [size]="12" />
+            </span>
+          }
+        </button>
+      } @empty {
+        <p class="empty muted">Nenhum item encontrado.</p>
+      }
+    </div>
+  </section>
+
+  @if (error()) {
+    <p class="error">{{ error() }}</p>
+  }
+</app-tile>

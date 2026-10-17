@@ -25,21 +25,6 @@
   </div>
 </header>
 
-@if (glance().length) {
-  <section class="glance" aria-label="Resumo">
-    @for (g of glance(); track g.label) {
-      <div class="glance-item" [attr.data-tone]="g.tone">
-        <app-icon [name]="g.icon" [size]="18" />
-        <span class="label">{{ g.label }}</span>
-        <strong>{{ g.value }}</strong>
-        @if (g.detail) {
-          <span class="detail">{{ g.detail }}</span>
-        }
-      </div>
-    }
-  </section>
-}
-
 <main class="grid">
   <app-weather-tile class="area-weather" />
   @for (p of people(); track p.id; let i = $index) {

@@ -2,95 +2,135 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { SECOND } from '../core/dashboard-data';
-import { ShoppingItem, ShoppingList } from '../core/models';
+import { ShoppingItem, ShoppingList, WhatsAppMessage } from '../core/models';
 import { pollingResource } from '../core/polling-resource';
 import { Icon } from '../shared/icon';
 import { Tile } from '../shared/tile';
 import { tileState, valueOf } from '../shared/resource-state';
 
 /**
- * Shared shopping list, stored by the API so every device edits the same list. Polls so an item
- * added on a phone shows up on the wall within seconds.
+ * Two lists in one tile: the household's usual items (tap a chip when it runs out) and the resulting
+ * "next trip" list, which is sent to WhatsApp before going to the supermarket. Stored by the API so
+ * every device marks the same list; polls so a tap on the phone shows up on the wall within seconds.
  */
 @Component({
   selector: 'app-shopping-tile',
   imports: [Tile, Icon],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <app-tile title="Lista de compras" icon="cart" accent="green" [state]="state()" [meta]="meta()">
-      <form class="add" (submit)="add($event, name, qty)">
-        <input #name type="text" placeholder="Adicionar item…" maxlength="100" autocomplete="off" aria-label="Item" />
-        <input #qty type="text" placeholder="Qtd" maxlength="20" autocomplete="off" aria-label="Quantidade" class="qty" />
-        <button type="submit" aria-label="Adicionar item"><app-icon name="plus" [size]="18" /></button>
-      </form>
-
-      <ul>
-        @for (item of items(); track item.id) {
-          <li [class.done]="item.done">
-            <label>
-              <input type="checkbox" [checked]="item.done" (change)="toggle(item)" />
-              <span class="box" aria-hidden="true"></span>
-              <span class="name">{{ item.name }}</span>
-              @if (item.quantity) {
-                <span class="q">{{ item.quantity }}</span>
-              }
-            </label>
-            <button type="button" class="remove" (click)="remove(item)" [attr.aria-label]="'Remover ' + item.name">
-              <app-icon name="x" [size]="14" />
-            </button>
-          </li>
-        } @empty {
-          <li class="empty muted">A lista está vazia.</li>
-        }
-      </ul>
-
-      @if (doneCount() > 0) {
-        <button type="button" class="clear" (click)="clearDone()">
-          <app-icon name="trash" [size]="14" />Limpar {{ doneCount() }} {{ doneCount() === 1 ? 'marcado' : 'marcados' }}
-        </button>
-      }
-      @if (error()) {
-        <p class="error">{{ error() }}</p>
-      }
-    </app-tile>
-  `,
+  templateUrl: './shopping-tile.html',
   styleUrl: './shopping-tile.scss',
 })
 export class ShoppingTile {
   private readonly http = inject(HttpClient);
   private readonly res = pollingResource<ShoppingList>('/api/shopping', 20 * SECOND);
   protected readonly state = computed(() => tileState(this.res));
-  protected readonly items = computed(() => valueOf(this.res)?.items ?? []);
-  protected readonly doneCount = computed(() => this.items().filter((i) => i.done).length);
-  protected readonly meta = computed(() => {
-    const left = this.items().length - this.doneCount();
-    return left === 1 ? '1 item' : `${left} itens`;
-  });
-  protected readonly error = signal<string | null>(null);
 
-  protected add(event: Event, name: HTMLInputElement, qty: HTMLInputElement) {
-    event.preventDefault();
-    const value = name.value.trim();
-    if (!value) return;
-    this.apply(this.http.post<ShoppingList>('/api/shopping', { name: value, quantity: qty.value.trim() || null }));
-    name.value = '';
-    qty.value = '';
-    name.focus();
+  protected readonly items = computed(() => valueOf(this.res)?.items ?? []);
+  /** Next trip, oldest first: the order things ran out. */
+  protected readonly trip = computed(() =>
+    this.items()
+      .filter((i) => i.needed)
+      .sort((a, b) => (a.neededSince ?? '').localeCompare(b.neededSince ?? '')),
+  );
+  protected readonly meta = computed(() => {
+    const n = this.trip().length;
+    return n === 0 ? 'Nada em falta' : n === 1 ? '1 em falta' : `${n} em falta`;
+  });
+
+  protected readonly query = signal('');
+  protected readonly editing = signal(false);
+  protected readonly error = signal<string | null>(null);
+  protected readonly sending = signal(false);
+
+  /** Household chips, filtered by what's typed in the add box. */
+  protected readonly chips = computed(() => {
+    const q = normalize(this.query());
+    return q ? this.items().filter((i) => normalize(i.name).includes(q)) : this.items();
+  });
+  /** Typed text that isn't an existing item: Enter adds it to the household list. */
+  protected readonly isNew = computed(() => {
+    const q = normalize(this.query());
+    return q.length > 0 && !this.items().some((i) => normalize(i.name) === q);
+  });
+
+  protected onInput(event: Event) {
+    this.query.set((event.target as HTMLInputElement).value);
   }
+
+  /** Enter / +: adds the typed name to the household items. Picking it for the next trip is a tap on its chip. */
+  protected add(event: Event, input: HTMLInputElement) {
+    event.preventDefault();
+    const name = input.value.trim();
+    if (!name || !this.isNew()) return;
+    this.apply(this.http.post<ShoppingList>('/api/shopping', { name }));
+    input.value = '';
+    this.query.set('');
+    input.focus();
+  }
+
+  /**
+   * − / + on a trip item. The count changes on screen immediately; the save waits for a short pause
+   * so tapping + four times sends one request with 5, not four racing ones.
+   */
+  protected step(item: ShoppingItem, delta: number) {
+    const quantity = Math.min(99, Math.max(1, item.quantity + delta));
+    if (quantity === item.quantity) return;
+    this.res.update((l) => l && { ...l, items: l.items.map((i) => (i.id === item.id ? { ...i, quantity } : i)) });
+    clearTimeout(this.pendingSaves.get(item.id));
+    this.pendingSaves.set(
+      item.id,
+      setTimeout(() => {
+        this.pendingSaves.delete(item.id);
+        this.apply(this.http.patch<ShoppingList>(`/api/shopping/${item.id}`, { quantity }));
+      }, 500),
+    );
+  }
+
+  private readonly pendingSaves = new Map<string, ReturnType<typeof setTimeout>>();
 
   protected toggle(item: ShoppingItem) {
-    // Optimistic: flip locally so the tap feels instant, then take the server's list.
-    this.res.update((l) => l && { ...l, items: l.items.map((i) => (i.id === item.id ? { ...i, done: !i.done } : i)) });
-    this.apply(this.http.patch<ShoppingList>(`/api/shopping/${item.id}`, { done: !item.done }));
+    if (this.editing()) return;
+    // Optimistic so the tap feels instant on a tablet; the server's list replaces it right after.
+    const now = new Date().toISOString();
+    this.res.update((l) => l && {
+      ...l,
+      items: l.items.map((i) =>
+        i.id === item.id ? { ...i, needed: !i.needed, neededSince: i.needed ? null : now, quantity: 1 } : i,
+      ),
+    });
+    this.apply(this.http.patch<ShoppingList>(`/api/shopping/${item.id}`, { needed: !item.needed }));
   }
 
-  protected remove(item: ShoppingItem) {
+  protected removeFromHousehold(item: ShoppingItem) {
+    if (!confirm(`Remover "${item.name}" dos itens da casa?`)) return;
     this.res.update((l) => l && { ...l, items: l.items.filter((i) => i.id !== item.id) });
     this.apply(this.http.delete<ShoppingList>(`/api/shopping/${item.id}`));
   }
 
-  protected clearDone() {
-    this.apply(this.http.delete<ShoppingList>('/api/shopping/done'));
+  protected clearTrip() {
+    if (!confirm('Compras feitas? Isto esvazia a lista da próxima compra (os itens da casa ficam).')) return;
+    this.apply(this.http.post<ShoppingList>('/api/shopping/trip/clear', {}));
+  }
+
+  /**
+   * Opens WhatsApp with the list ready to send. The window is opened synchronously in the click
+   * handler and pointed at wa.me once the text arrives, otherwise browsers treat it as a popup.
+   */
+  protected sendToWhatsApp() {
+    const win = window.open('', '_blank');
+    this.sending.set(true);
+    this.http.get<WhatsAppMessage>('/api/shopping/whatsapp').subscribe({
+      next: (m) => {
+        this.sending.set(false);
+        if (win) win.location.href = m.url;
+        else location.href = m.url;
+      },
+      error: () => {
+        this.sending.set(false);
+        win?.close();
+        this.error.set('Não foi possível preparar a mensagem do WhatsApp.');
+      },
+    });
   }
 
   private apply(request: Observable<ShoppingList>) {
@@ -105,4 +145,9 @@ export class ShoppingTile {
       },
     });
   }
+}
+
+/** Case- and accent-insensitive match, so "acucar" finds "Açúcar". */
+function normalize(s: string) {
+  return s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
 }

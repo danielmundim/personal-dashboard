@@ -10,10 +10,10 @@ public sealed class MockPartyProvider(LocalClock clock) : IPartyProvider
 
         var parties = new List<Party>
         {
-            new("Aniversário de 40 anos do Tiago", "Tiago e Marta", clock.At(d.AddDays(7), 20), "Terraço, Rua das Flores", "Presente (vaquinha)", null),
-            new("Festa de Halloween", "Joana", clock.At(d.AddDays(14), 21), "Casa da Joana, Matosinhos", "Petiscos", "Fantasia"),
-            new("Open house", "Pedro e Sara", clock.At(d.AddDays(22), 19, 30), "Foz do Douro", "Uma planta", null),
-            new("Jantar de Natal do salão", "Equipe do salão", clock.At(new DateOnly(d.Year, 12, 12), 20), "Restaurante O Paparico", null, "Esporte fino"),
+            new("Aniversário de 40 anos do Tiago", clock.At(d.AddDays(7), 20), null, false, "Terraço, Rua das Flores", "Tiago e Marta", "Presente (vaquinha)"),
+            new("Festa de Halloween", clock.At(d.AddDays(14), 21), null, false, "Casa da Joana, Matosinhos", "Joana", "Petiscos", "Fantasia"),
+            new("Open house", clock.At(d.AddDays(22), 19, 30), null, false, "Foz do Douro", "Pedro e Sara", "Uma planta"),
+            new("Jantar de Natal do salão", clock.At(new DateOnly(d.Year, 12, 12), 20), null, false, "Restaurante O Paparico", "Equipe do salão", DressCode: "Esporte fino"),
         };
 
         return Task.FromResult(new PartyList(parties.Where(p => p.Start > clock.Now).OrderBy(p => p.Start).ToList(), clock.Now));

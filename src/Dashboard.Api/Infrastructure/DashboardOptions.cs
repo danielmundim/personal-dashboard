@@ -122,8 +122,10 @@ public sealed class IntegrationOptions
     /// <summary>"Noona" (needs Dashboard:Noona:ClientId/ClientSecret) or "Mock".</summary>
     public string Appointments { get; init; } = Mock;
 
+    /// <summary>"File" (App_Data/city-events.json, edited by hand) or "Mock".</summary>
     public string CityEvents { get; init; } = Mock;
 
+    /// <summary>"File" (App_Data/parties.json, edited by hand) or "Mock".</summary>
     public string Parties { get; init; } = Mock;
 
 }

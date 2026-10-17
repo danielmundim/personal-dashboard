@@ -47,7 +47,7 @@ import { tileState, valueOf } from '../shared/resource-state';
             </span>
           </li>
         } @empty {
-          <li class="muted">Nenhum ônibus previsto agora</li>
+          <li class="muted empty">Nenhum ônibus previsto agora</li>
         }
       </ol>
     </app-tile>
@@ -58,6 +58,7 @@ import { tileState, valueOf } from '../shared/resource-state';
     li { display: grid; grid-template-columns: 46px 1fr auto; align-items: center; gap: 12px; padding: 7px 0; }
     li + li { border-top: 1px solid var(--border); }
     li.missed { opacity: 0.45; }
+    li.empty { display: block; }
     .line {
       display: grid; place-items: center; height: 30px; border-radius: 8px;
       font-weight: 700; font-size: 0.85rem; color: #fff; background: #1f6fb2;

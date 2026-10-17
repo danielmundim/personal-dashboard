@@ -1,6 +1,149 @@
+h3 {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ---------- Next trip ---------- */
+
+.trip ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+
+.trip li {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  border-bottom: 1px solid var(--border);
+
+  &:last-child { border-bottom: 0; }
+
+  .name { font-weight: 500; }
+
+  .stepper {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 9px;
+    background: var(--surface-2);
+
+    button {
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      border: 0;
+      border-radius: 9px;
+      font: inherit;
+      font-size: 1.05rem;
+      font-weight: 600;
+      line-height: 1;
+      color: var(--text-muted);
+      background: transparent;
+      cursor: pointer;
+
+      &:hover:not(:disabled) { color: var(--green); background: color-mix(in srgb, var(--green) 14%, transparent); }
+      &:disabled { opacity: 0.35; cursor: default; }
+    }
+
+    .count { min-width: 22px; text-align: center; font-weight: 600; }
+  }
+}
+
+.remove {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--text-faint);
+  background: transparent;
+  cursor: pointer;
+
+  &:hover { color: var(--rose); background: var(--surface-2); }
+}
+
+.empty { margin: 0; font-size: 0.85rem; }
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+
+  button {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 38px;
+    padding: 0 14px;
+    border-radius: 10px;
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .whatsapp {
+    border: 0;
+    color: #fff;
+    background: #1fa855; // WhatsApp-like green, readable with white text in both themes
+
+    &:disabled { opacity: 0.45; cursor: default; }
+  }
+
+  .done {
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    background: transparent;
+
+    &:hover { color: var(--text); border-color: var(--border-strong); }
+  }
+}
+
+/* ---------- Household items ---------- */
+
+.household {
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.household-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+
+  &.on { color: var(--green); border-color: var(--green); }
+}
+
 .add {
   display: grid;
-  grid-template-columns: 1fr 70px 40px;
+  grid-template-columns: 1fr 40px;
   gap: 6px;
 
   input {
@@ -25,95 +168,54 @@
     color: #fff;
     background: var(--green);
     cursor: pointer;
+
+    &:disabled { opacity: 0.4; cursor: default; }
   }
 }
 
-ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-}
+.hint { margin-top: -4px; font-size: 0.75rem; }
 
-li {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  border-bottom: 1px solid var(--border);
-
-  &:last-child { border-bottom: 0; }
-
-  &.done .name { color: var(--text-faint); text-decoration: line-through; }
-  &.done .box { border-color: var(--green); background: var(--green); }
-  &.done .box::after { opacity: 1; }
-  &.empty { display: block; padding: 10px 0; }
-}
-
-label {
+.chips {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 42px;
-  cursor: pointer;
-
-  input { position: absolute; opacity: 0; pointer-events: none; }
-  input:focus-visible + .box { outline: 2px solid var(--green); outline-offset: 2px; }
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
-.box {
-  position: relative;
-  flex: none;
-  width: 20px;
-  height: 20px;
-  border: 2px solid var(--border-strong);
-  border-radius: 6px;
-
-  &::after {
-    content: '';
-    position: absolute;
-    left: 5px;
-    top: 1px;
-    width: 5px;
-    height: 10px;
-    border: solid #fff;
-    border-width: 0 2px 2px 0;
-    transform: rotate(45deg);
-    opacity: 0;
-  }
-}
-
-.name { font-weight: 500; }
-.q { font-size: 0.78rem; color: var(--text-faint); }
-
-.remove {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border: 0;
-  border-radius: 8px;
-  color: var(--text-faint);
-  background: transparent;
-  cursor: pointer;
-
-  &:hover { color: var(--rose); background: var(--surface-2); }
-}
-
-.clear {
-  align-self: flex-start;
+.chip-item {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 10px;
+  min-height: 34px;
+  padding: 0 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 999px;
   font: inherit;
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  background: transparent;
+  font-size: 0.85rem;
+  color: var(--text);
+  background: var(--surface-2);
   cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
 
-  &:hover { color: var(--text); border-color: var(--border-strong); }
+  &.needed {
+    color: color-mix(in srgb, var(--green) 85%, var(--text));
+    border-color: color-mix(in srgb, var(--green) 55%, transparent);
+    background: color-mix(in srgb, var(--green) 16%, var(--surface-2));
+    font-weight: 600;
+  }
+
+  .editing & { cursor: default; }
+}
+
+.del {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-right: -6px;
+  border-radius: 50%;
+  color: var(--rose);
+  background: color-mix(in srgb, var(--rose) 14%, transparent);
+  cursor: pointer;
 }
 
 .error { margin: 0; font-size: 0.8rem; color: var(--rose); }

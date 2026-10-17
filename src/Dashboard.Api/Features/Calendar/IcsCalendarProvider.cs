@@ -47,7 +47,7 @@ public sealed class IcsCalendarProvider(
     {
         try
         {
-            var text = await http.GetStringAsync(feed.Url, ct);
+            var text = await http.GetStringAsync(ToHttps(feed.Url), ct);
             var calendar = IcalCalendar.Load(text);
             var list = new List<CalendarEvent>();
 
@@ -82,6 +82,12 @@ public sealed class IcsCalendarProvider(
             return null;
         }
     }
+
+    /// <summary>
+    /// iPhone/iCloud "Share Link" gives webcal:// addresses; webcal is just iCal over HTTPS, so fetch it as such.
+    /// </summary>
+    internal static string ToHttps(string url) =>
+        url.Trim() is var u && u.StartsWith("webcal://", StringComparison.OrdinalIgnoreCase) ? "https://" + u["webcal://".Length..] : u.Trim();
 
     /// <summary>
     /// All-day dates are floating (no zone): pin them to local midnight. Timed events carry their own zone

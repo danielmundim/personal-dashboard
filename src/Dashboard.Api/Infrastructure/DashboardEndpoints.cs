@@ -68,10 +68,10 @@ public static class DashboardEndpoints
                 : p.GetEstimateAsync(ct));
 
         api.MapGet("/city-events", (ICityEventProvider p, HybridCache c, CancellationToken ct) =>
-            Cached(c, "city-events", TimeSpan.FromHours(1), p.GetUpcomingAsync, ct));
+            Cached(c, "city-events", TimeSpan.FromMinutes(1), p.GetUpcomingAsync, ct)); // short: hand edits show up quickly
 
         api.MapGet("/parties", (IPartyProvider p, HybridCache c, CancellationToken ct) =>
-            Cached(c, "parties", TimeSpan.FromMinutes(10), p.GetUpcomingAsync, ct));
+            Cached(c, "parties", TimeSpan.FromMinutes(1), p.GetUpcomingAsync, ct)); // short: edits to parties.json show up quickly
 
         MapShopping(api.MapGroup("/shopping"));
         MapPhotos(api.MapGroup("/photos"));
@@ -90,7 +90,12 @@ public static class DashboardEndpoints
 
         g.MapPatch("/{id:guid}", (Guid id, UpdateShoppingItem req, ShoppingStore s, CancellationToken ct) => s.UpdateAsync(id, req, ct));
         g.MapDelete("/{id:guid}", (Guid id, ShoppingStore s, CancellationToken ct) => s.RemoveAsync(id, ct));
-        g.MapDelete("/done", (ShoppingStore s, CancellationToken ct) => s.ClearDoneAsync(ct));
+
+        // "Compras feitas": empties the trip list, keeps the household items.
+        g.MapPost("/trip/clear", (ShoppingStore s, CancellationToken ct) => s.ClearTripAsync(ct));
+
+        // The browser opens this wa.me link; WhatsApp shows the message ready to send (nothing is sent automatically).
+        g.MapGet("/whatsapp", (ShoppingStore s, CancellationToken ct) => s.BuildWhatsAppAsync(ct));
     }
 
     private static void MapPhotos(RouteGroupBuilder g)

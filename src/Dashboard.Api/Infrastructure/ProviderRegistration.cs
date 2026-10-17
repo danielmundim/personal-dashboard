@@ -28,6 +28,7 @@ public static class ProviderRegistration
 
         // Data the dashboard owns or can compute itself: always real.
         services.AddSingleton<IHolidayProvider, PortugueseHolidayProvider>();
+        services.Configure<ShoppingOptions>(configuration.GetSection(ShoppingOptions.SectionName));
         services.AddSingleton<ShoppingStore>();
         services.AddSingleton<PhotoStore>();
 
@@ -104,8 +105,24 @@ public static class ProviderRegistration
         {
             services.AddSingleton<IAppointmentProvider, MockAppointmentProvider>();
         }
-        services.AddSingleton<ICityEventProvider, MockCityEventProvider>();
-        services.AddSingleton<IPartyProvider, MockPartyProvider>();
+        if (Is(integrations.CityEvents, "File"))
+        {
+            services.AddSingleton<ICityEventProvider, FileCityEventProvider>();
+            mock.Remove("cityEvents");
+        }
+        else
+        {
+            services.AddSingleton<ICityEventProvider, MockCityEventProvider>();
+        }
+        if (Is(integrations.Parties, "File"))
+        {
+            services.AddSingleton<IPartyProvider, FilePartyProvider>();
+            mock.Remove("parties");
+        }
+        else
+        {
+            services.AddSingleton<IPartyProvider, MockPartyProvider>();
+        }
 
         services.AddSingleton(new IntegrationStatus(mock));
 

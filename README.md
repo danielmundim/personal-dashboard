@@ -13,10 +13,10 @@ the home network now, and to run on a Raspberry Pi with a wall screen later.
 | Bus departures × 2 (stops RMT3 and RMT2 in `Dashboard:BusStops`) | **Real**: STCP live arrivals (`stcp.pt/api/stops/{code}/realtime`, undocumented) | — |
 | Drive to work | **Real** once `Dashboard:Commute:GoogleApiKey` is set: Google Routes API, traffic-aware. Sample data until then. Waze rejects server requests (403/410) | — |
 | Bank holidays | **Real**, computed in the API (PT national + municipal + Carnival) | — |
-| Shopping list | **Real**, stored in `App_Data/shopping.json`, shared across devices | — |
+| Shopping list: household items → next trip → WhatsApp | **Real**, stored in `App_Data/shopping.json`, shared across devices | — |
 | Photos slideshow | **Real** uploads, stored in `App_Data/photos/` (sample images until the first upload) | — |
-| Parties we're attending | Mock | Calendar events tagged #party, or a list edited on the dashboard |
-| What's on in the city | Mock | To be decided |
+| Parties and festivals we're going to | **Real**: `App_Data/parties.json`, edited by hand | — |
+| What's on in Porto and Gaia | **Real**: `App_Data/city-events.json`, edited by hand (no public feed covers the city agenda) | — |
 
 `Dashboard:Integrations` in `src/Dashboard.Api/appsettings.json` picks the source for each widget
 (`"Mock"` serves sample data). The header badge counts the tiles still on sample data. Names, stops,
@@ -28,6 +28,39 @@ overrides `appsettings.json`. Future API keys go there too:
 ```json
 { "Dashboard": { "Home": { "Name": "Vila Nova de Gaia", "Latitude": 41.12, "Longitude": -8.63 } } }
 ```
+
+### Shopping list
+
+- **Itens da casa** are the usual items, shown as chips. Tap one when it runs out, and it moves to
+  **Próxima compra**, with a − / + quantity (whole number, starting at 1). The WhatsApp message shows
+  "2× Leite" when the quantity is above 1, and the count goes back to 1 when the item leaves the list. Type in the box to search (accents don't matter); **+** or
+  Enter adds a new item, by name only, to the household list.
+- **Enviar para WhatsApp** opens WhatsApp (the app on phones and tablets, WhatsApp Web on a PC) with
+  the list ready to send. Nothing is sent automatically. Set `Dashboard:Shopping:WhatsAppNumber` in
+  `appsettings.Local.json` (international format, e.g. `351912345678`) to go straight to that chat.
+  Leave it empty to pick a chat or group each time.
+- **Compras feitas** empties the trip list and keeps the household items. **Editar** lets you remove
+  household items.
+
+### Parties
+
+`App_Data/parties.json` holds our agenda. Dates are local (`yyyy-MM-dd`); `end` is for multi-day
+festivals, and `time` (`HH:mm`), `location`, `host`, `bring` and `dressCode` are optional. Past events
+drop off by themselves, and edits show up within a minute.
+
+```json
+{ "parties": [
+  { "title": "Tomorrowland Brasil", "start": "2027-04-30", "end": "2027-05-02", "location": "Parque Maeda, Itu (SP)" },
+  { "title": "Aniversário", "start": "2026-11-07", "time": "20:00", "location": "Casa da Joana", "bring": "Sobremesa" }
+] }
+```
+
+### City events
+
+`App_Data/city-events.json` is created on first run with examples in comments. It uses the same date
+rules as `parties.json`, plus optional `venue`, `category` (Música, Exposição, Feira, Teatro, Gastronomia…
+each has its own colour), `price` and `url` (makes the card a link). I checked Porto open data,
+porto.pt, Câmara de Gaia, Casa da Música, RA and Viral Agenda, and none has a usable public events feed.
 
 ### Calendars (iCal links)
 
@@ -48,6 +81,8 @@ expanded, cancelled ones dropped, and an event that's in two feeds is shown once
 - **Google:** Settings → your calendar → *Integrate calendar* → **Secret address in iCal format**.
   The *public* address only works if the calendar is public to everyone, and returns 404 otherwise.
 - **Outlook / Microsoft 365:** Settings → Calendar → Shared calendars → *Publish a calendar* → ICS link.
+- **iPhone (iCloud):** Calendar app → *Calendars* → ⓘ next to an iCloud calendar → turn on *Public Calendar*
+  → *Share Link…*. The `webcal://` link works as is; anyone with it can read the calendar, so keep it private.
 - `BusyOnly` shows "Ocupado" instead of titles. A feed that fails is named on the tile, and the
   others still show. Feed URLs are never logged.
 

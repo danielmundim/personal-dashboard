@@ -77,39 +77,6 @@
   &:hover { color: var(--text); border-color: var(--border-strong); }
 }
 
-/* ---------- At a glance ---------- */
-
-.glance {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px;
-}
-
-.glance-item {
-  --tone: var(--sky);
-  display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-rows: auto auto auto;
-  align-content: center;
-  column-gap: 12px;
-  align-items: center;
-  padding: 12px 16px;
-  border-radius: var(--radius);
-  background: color-mix(in srgb, var(--tone) 10%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--tone) 22%, var(--border));
-
-  app-icon { grid-row: 1 / -1; color: var(--tone); }
-  .label { font-size: 0.75rem; color: var(--text-muted); }
-  .detail { grid-column: 2; font-size: 0.78rem; color: var(--text-muted); }
-  strong { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-  &[data-tone='amber'] { --tone: var(--amber); }
-  &[data-tone='green'] { --tone: var(--green); }
-  &[data-tone='violet'] { --tone: var(--violet); }
-  &[data-tone='rose'] { --tone: var(--rose); }
-  &[data-tone='teal'] { --tone: var(--teal); }
-}
-
 /* ---------- Tile grid ---------- */
 /* Wall / laptop: 4 columns. Tablet landscape & small laptops: 2. Phone / tablet portrait: 1. */
 
