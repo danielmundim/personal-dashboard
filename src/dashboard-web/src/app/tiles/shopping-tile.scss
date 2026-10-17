@@ -1,0 +1,119 @@
+.add {
+  display: grid;
+  grid-template-columns: 1fr 70px 40px;
+  gap: 6px;
+
+  input {
+    min-width: 0;
+    height: 40px;
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font: inherit;
+    color: var(--text);
+    background: var(--surface-2);
+
+    &:focus { outline: 2px solid color-mix(in srgb, var(--green) 50%, transparent); outline-offset: 1px; }
+    &::placeholder { color: var(--text-faint); }
+  }
+
+  button {
+    display: grid;
+    place-items: center;
+    border: 0;
+    border-radius: 10px;
+    color: #fff;
+    background: var(--green);
+    cursor: pointer;
+  }
+}
+
+ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+
+li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+
+  &:last-child { border-bottom: 0; }
+
+  &.done .name { color: var(--text-faint); text-decoration: line-through; }
+  &.done .box { border-color: var(--green); background: var(--green); }
+  &.done .box::after { opacity: 1; }
+  &.empty { display: block; padding: 10px 0; }
+}
+
+label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 42px;
+  cursor: pointer;
+
+  input { position: absolute; opacity: 0; pointer-events: none; }
+  input:focus-visible + .box { outline: 2px solid var(--green); outline-offset: 2px; }
+}
+
+.box {
+  position: relative;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border-strong);
+  border-radius: 6px;
+
+  &::after {
+    content: '';
+    position: absolute;
+    left: 5px;
+    top: 1px;
+    width: 5px;
+    height: 10px;
+    border: solid #fff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+    opacity: 0;
+  }
+}
+
+.name { font-weight: 500; }
+.q { font-size: 0.78rem; color: var(--text-faint); }
+
+.remove {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--text-faint);
+  background: transparent;
+  cursor: pointer;
+
+  &:hover { color: var(--rose); background: var(--surface-2); }
+}
+
+.clear {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+
+  &:hover { color: var(--text); border-color: var(--border-strong); }
+}
+
+.error { margin: 0; font-size: 0.8rem; color: var(--rose); }

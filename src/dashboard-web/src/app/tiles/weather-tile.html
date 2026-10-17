@@ -1,0 +1,110 @@
+<app-tile title="Tempo" icon="cloudSun" accent="sky" [state]="state()" [meta]="w()?.location">
+  @if (w(); as w) {
+    <div class="top">
+      <div class="now">
+        <app-icon class="now-icon" [name]="weatherIcon(w.now.condition)" [size]="64" [stroke]="1.4" />
+        <div class="now-temp num">{{ w.now.temperatureC | number: '1.0-0' }}<span>°</span></div>
+        <div class="now-desc">
+          <strong>{{ w.now.description }}</strong>
+          <span class="muted">Sensação de {{ w.now.feelsLikeC | number: '1.0-0' }}°</span>
+        </div>
+      </div>
+      <dl class="now-stats">
+        <div>
+          <dt><app-icon name="wind" [size]="14" /> Vento</dt>
+          <dd class="num">{{ w.now.windKmh }} km/h {{ w.now.windDirection }}</dd>
+          <small>rajadas de {{ w.now.windGustKmh }}</small>
+        </div>
+        <div>
+          <dt><app-icon name="sun" [size]="14" /> Índice UV</dt>
+          <dd class="num">{{ w.now.uvIndex }}</dd>
+          <small>{{ uvLabel(w.now.uvIndex) }}</small>
+        </div>
+        <div>
+          <dt><app-icon name="droplet" [size]="14" /> Umidade</dt>
+          <dd class="num">{{ w.now.humidityPct }}%</dd>
+        </div>
+        <div>
+          <dt><app-icon name="sunrise" [size]="14" /> Sol</dt>
+          <dd class="num">{{ fmt.time(w.sun.sunrise) }} – {{ fmt.time(w.sun.sunset) }}</dd>
+          @if (daylight(); as dl) {
+            <small>{{ dl.length }} · {{ dl.change }}</small>
+          }
+        </div>
+      </dl>
+    </div>
+
+    @if (w.hints.length) {
+      <div class="hints">
+        @for (hint of w.hints; track hint.text) {
+          <span class="hint" [attr.data-kind]="hint.kind"><app-icon [name]="hintIcons[hint.kind]" [size]="16" />{{ hint.text }}</span>
+        }
+      </div>
+    }
+
+    <section>
+      <h3>Próximas {{ nextHours().length }} horas</h3>
+      <ol class="next-hours">
+        @for (h of nextHours(); track h.time; let first = $first) {
+          <li [class.wet]="h.precipitationPct >= 50">
+            <span class="h-time num">{{ first ? 'Agora' : fmt.time(h.time) }}</span>
+            <app-icon [name]="weatherIcon(h.condition)" [size]="26" />
+            <strong class="num">{{ h.temperatureC | number: '1.0-0' }}°</strong>
+            <span class="h-rain num" [title]="h.precipitationMm + ' mm'">
+              <span class="rain-meter"><span [style.height.%]="h.precipitationPct"></span></span>
+              {{ h.precipitationPct }}%
+            </span>
+            <span class="h-wind num"><app-icon name="wind" [size]="12" />{{ h.windKmh }}</span>
+            <span class="h-uv num" [attr.data-uv]="uvLevel(h.uvIndex)">UV {{ h.uvIndex }}</span>
+          </li>
+        }
+      </ol>
+    </section>
+
+    @if (chart(); as c) {
+      <section>
+        <h3>{{ c.title }}</h3>
+        <svg class="hourly" [attr.viewBox]="'0 0 ' + chartW + ' ' + chartH" role="img" [attr.aria-label]="c.title">
+          @for (p of c.points; track $index) {
+            <rect class="rain-bar" [attr.x]="p.x - c.barW / 2" [attr.y]="96 - p.rainH" [attr.width]="c.barW" [attr.height]="p.rainH" rx="3" />
+          }
+          <path class="temp-line" [attr.d]="c.line" />
+          @for (p of c.points; track $index) {
+            <circle class="temp-dot" [attr.cx]="p.x" [attr.cy]="p.y" r="3" />
+            <text class="temp-label" [attr.x]="p.x" [attr.y]="p.y - 8">{{ p.temp }}°</text>
+            <text class="hour-label" [attr.x]="p.x" y="113">{{ p.label }}</text>
+          }
+        </svg>
+        <div class="legend muted"><span class="sw temp"></span>Temperatura <span class="sw rain"></span>Chance de chuva</div>
+      </section>
+    }
+
+    <section>
+      <h3>Próximos 7 dias</h3>
+      <ol class="week">
+        <li class="week-head" aria-hidden="true">
+          <span></span><span></span><span>Chuva</span><span class="range-head">Mín. / máx.</span><span>Vento</span><span>UV</span>
+        </li>
+        @for (d of week(); track d.date) {
+          <li>
+            <span class="day">{{ d.label }}</span>
+            <app-icon [name]="weatherIcon(d.condition)" [size]="22" />
+            <span class="rain num" [class.wet]="d.precipitationPct >= 50">
+              {{ d.precipitationPct }}%
+              @if (d.precipitationMm > 0) {
+                <small>{{ d.precipitationMm | number: '1.0-1' }} mm</small>
+              }
+            </span>
+            <span class="range num">
+              <span class="lo">{{ d.minC }}°</span>
+              <span class="track"><span class="fill" [style.left.%]="d.left" [style.width.%]="d.width"></span></span>
+              <span class="hi">{{ d.maxC }}°</span>
+            </span>
+            <span class="num wind">{{ d.windMaxKmh }}<small> km/h</small></span>
+            <span class="num uv" [attr.data-uv]="uvLevel(d.uvMax)">{{ d.uvMax }}</span>
+          </li>
+        }
+      </ol>
+    </section>
+  }
+</app-tile>

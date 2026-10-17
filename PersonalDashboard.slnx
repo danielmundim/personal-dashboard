@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Dashboard.Api/Dashboard.Api.csproj" />
+  </Folder>
+</Solution>

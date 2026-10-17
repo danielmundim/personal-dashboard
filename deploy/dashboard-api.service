@@ -1,0 +1,20 @@
+# /etc/systemd/system/dashboard-api.service
+#   sudo systemctl daemon-reload && sudo systemctl enable --now dashboard-api
+[Unit]
+Description=Home dashboard API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=/opt/dashboard-api
+ExecStart=/opt/dashboard-api/Dashboard.Api
+Environment=ASPNETCORE_URLS=http://127.0.0.1:5080
+Environment=ASPNETCORE_ENVIRONMENT=Production
+# API keys go in this file (not in git), e.g. Dashboard__UseMockData=false
+EnvironmentFile=-/etc/dashboard-api.env
+Restart=always
+RestartSec=5
+User=dashboard
+
+[Install]
+WantedBy=multi-user.target

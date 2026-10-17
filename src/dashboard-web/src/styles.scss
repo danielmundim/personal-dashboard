@@ -1,0 +1,103 @@
+@use '@fontsource-variable/inter';
+
+/* Design tokens. Light is the default; dark follows the OS unless pinned via data-theme. */
+:root {
+  color-scheme: light;
+  --bg: #f3f1ec;
+  --surface: #fffefb;
+  --surface-2: #f1eee7;
+  --border: #e6e1d6;
+  --border-strong: #cfc8b8;
+  --text: #1f1d1a;
+  --text-muted: #5c574d;
+  --text-faint: #8d8778;
+  --shadow: 0 1px 2px rgb(40 30 10 / 4%), 0 4px 16px rgb(40 30 10 / 4%);
+  --radius: 18px;
+
+  --sky: #2f7ec7;
+  --amber: #c9790f;
+  --green: #2f8f5b;
+  --violet: #7a4fc4;
+  --rose: #cc4b5c;
+  --teal: #1c8c8c;
+  --hue-text-l: 40%; /* lightness for text tinted by a per-item hue */
+}
+
+@mixin dark {
+  color-scheme: dark;
+  --bg: #121417;
+  --surface: #1b1e23;
+  --surface-2: #23272e;
+  --border: #2c3139;
+  --border-strong: #3d434d;
+  --text: #ecebe8;
+  --text-muted: #a8a7a2;
+  --text-faint: #75757a;
+  --shadow: 0 1px 2px rgb(0 0 0 / 30%);
+
+  --sky: #6cb2f0;
+  --amber: #f0ac4b;
+  --green: #5cc58b;
+  --violet: #a98cf0;
+  --rose: #f07c8a;
+  --teal: #4fc4c0;
+  --hue-text-l: 72%;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) { @include dark; }
+}
+
+:root[data-theme='dark'] { @include dark; }
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- Shared utilities used by tiles ---------- */
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.chip {
+  --tone: var(--text-faint);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--tone) 85%, var(--text));
+  background: color-mix(in srgb, var(--tone) 14%, transparent);
+
+  &[data-tone='sky'] { --tone: var(--sky); }
+  &[data-tone='amber'] { --tone: var(--amber); }
+  &[data-tone='green'] { --tone: var(--green); }
+  &[data-tone='violet'] { --tone: var(--violet); }
+  &[data-tone='rose'] { --tone: var(--rose); }
+  &[data-tone='teal'] { --tone: var(--teal); }
+}

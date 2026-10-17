@@ -1,0 +1,162 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 1760px;
+  margin: 0 auto;
+  padding: 24px clamp(16px, 2.5vw, 36px) 40px;
+}
+
+/* ---------- Header ---------- */
+
+.top {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px 32px;
+}
+
+.clock {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.time {
+  font-size: clamp(3rem, 6vw, 5rem);
+  font-weight: 250;
+  line-height: 1;
+  letter-spacing: -0.05em;
+}
+
+.date {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 1.05rem;
+  color: var(--text-muted);
+
+  .greeting {
+    font-size: 1.35rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+}
+
+.now-weather {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 32px;
+  border-left: 1px solid var(--border);
+
+  app-icon { color: var(--amber); }
+  .num { font-size: 2rem; font-weight: 300; }
+
+  @media (max-width: 640px) { padding-left: 0; border-left: 0; }
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text-muted);
+  background: var(--surface);
+  cursor: pointer;
+
+  &:hover { color: var(--text); border-color: var(--border-strong); }
+}
+
+/* ---------- At a glance ---------- */
+
+.glance {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.glance-item {
+  --tone: var(--sky);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 12px;
+  align-items: center;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--tone) 10%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--tone) 22%, var(--border));
+
+  app-icon { grid-row: span 2; color: var(--tone); }
+  .label { font-size: 0.75rem; color: var(--text-muted); }
+  strong { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  &[data-tone='amber'] { --tone: var(--amber); }
+  &[data-tone='green'] { --tone: var(--green); }
+  &[data-tone='violet'] { --tone: var(--violet); }
+  &[data-tone='rose'] { --tone: var(--rose); }
+  &[data-tone='teal'] { --tone: var(--teal); }
+}
+
+/* ---------- Tile grid ---------- */
+/* Wall / laptop: 4 columns. Tablet landscape & small laptops: 2. Phone / tablet portrait: 1. */
+
+.grid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-areas:
+    'weather weather cal0     cal1'
+    'bus0    bus1    clients  drive'
+    'photos  photos  shopping holidays'
+    'photos  photos  shopping parties'
+    'events  events  events   events';
+
+  @media (max-width: 1360px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      'weather  weather'
+      'cal0     cal1'
+      'bus0     bus1'
+      'drive    clients'
+      'photos   photos'
+      'shopping holidays'
+      'shopping parties'
+      'events   events';
+  }
+
+  @media (max-width: 760px) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'weather' 'drive' 'bus0' 'bus1' 'cal0' 'cal1' 'clients' 'shopping' 'photos' 'holidays' 'parties' 'events';
+  }
+
+  > * {
+    display: flex;
+    min-width: 0;
+
+    > ::ng-deep app-tile { flex: 1; }
+  }
+}
+
+.area-weather { grid-area: weather; }
+.area-cal0 { grid-area: cal0; }
+.area-cal1 { grid-area: cal1; }
+.area-bus0 { grid-area: bus0; }
+.area-bus1 { grid-area: bus1; }
+.area-clients { grid-area: clients; }
+.area-drive { grid-area: drive; }
+.area-photos { grid-area: photos; }
+.area-shopping { grid-area: shopping; }
+.area-holidays { grid-area: holidays; }
+.area-parties { grid-area: parties; }
+.area-events { grid-area: events; }
