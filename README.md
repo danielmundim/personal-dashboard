@@ -7,19 +7,82 @@ the home network now, and to run on a Raspberry Pi with a wall screen later.
 
 | Tile | Data today | Planned source |
 | --- | --- | --- |
-| Weather: now, next 6 h (rain %, wind, UV), rest of today by hour, 7 days, umbrella/jacket hints | Mock | IPMA or Open-Meteo |
-| Calendar × 2 (one per person in `Dashboard:People`) | Mock | Google Calendar / ICS |
-| Next clients | Mock | Noona HQ API |
-| Bus departures × 2 (one per stop in `Dashboard:BusStops`, with walk time) | Mock | STCP real-time |
-| Drive to wife's work | Mock | Waze live-map routing (unofficial) or Google Routes API |
+| Weather: now, next 6 h (rain %, wind, UV), rest of today by hour, 7 days, umbrella/jacket hints | **Real**: Open-Meteo, free, no key | — |
+| Calendar × 2 (one per person in `Dashboard:People`) | **Real**: iCal links per person, several merged into one tile | — |
+| Next clients | **Real** once the Noona OAuth app is configured and connected (see below). Sample data until configured | — |
+| Bus departures × 2 (stops RMT3 and RMT2 in `Dashboard:BusStops`) | **Real**: STCP live arrivals (`stcp.pt/api/stops/{code}/realtime`, undocumented) | — |
+| Drive to work | **Real** once `Dashboard:Commute:GoogleApiKey` is set: Google Routes API, traffic-aware. Sample data until then. Waze rejects server requests (403/410) | — |
 | Bank holidays | **Real**, computed in the API (PT national + municipal + Carnival) | — |
 | Shopping list | **Real**, stored in `App_Data/shopping.json`, shared across devices | — |
 | Photos slideshow | **Real** uploads, stored in `App_Data/photos/` (sample images until the first upload) | — |
 | Parties we're attending | Mock | Calendar events tagged #party, or a list edited on the dashboard |
 | What's on in the city | Mock | To be decided |
 
-A "Sample data" badge in the header shows while `Dashboard:UseMockData` is `true`. Names, stops,
-the commute label and the municipal holiday are all set in `src/Dashboard.Api/appsettings.json`.
+`Dashboard:Integrations` in `src/Dashboard.Api/appsettings.json` picks the source for each widget
+(`"Mock"` serves sample data). The header badge counts the tiles still on sample data. Names, stops,
+the commute label and the municipal holiday are set in the same file.
+
+Exact home coordinates go in `src/Dashboard.Api/appsettings.Local.json`, which is git-ignored and
+overrides `appsettings.json`. Future API keys go there too:
+
+```json
+{ "Dashboard": { "Home": { "Name": "Vila Nova de Gaia", "Latitude": 41.12, "Longitude": -8.63 } } }
+```
+
+### Calendars (iCal links)
+
+Each person's tile merges any number of iCal feeds, e.g. personal and work. Repeating events are
+expanded, cancelled ones dropped, and an event that's in two feeds is shown once. Put the links in
+`appsettings.Local.json`, because a private iCal link is a password:
+
+```json
+"Calendars": {
+  "daniel": [
+    { "Name": "Pessoal",  "Url": "https://calendar.google.com/calendar/ical/.../private-.../basic.ics" },
+    { "Name": "Trabalho", "Url": "https://...", "BusyOnly": true }
+  ],
+  "leesy": [ { "Name": "Pessoal", "Url": "https://..." } ]
+}
+```
+
+- **Google:** Settings → your calendar → *Integrate calendar* → **Secret address in iCal format**.
+  The *public* address only works if the calendar is public to everyone, and returns 404 otherwise.
+- **Outlook / Microsoft 365:** Settings → Calendar → Shared calendars → *Publish a calendar* → ICS link.
+- `BusyOnly` shows "Ocupado" instead of titles. A feed that fails is named on the tile, and the
+  others still show. Feed URLs are never logged.
+
+### Noona (salon clients)
+
+Noona's HQ API only supports OAuth 2.0, so this is a one-time connect rather than a key:
+
+1. In the [Noona Developer Portal](https://developers.noona.app/), create an app while logged in with a
+   Noona HQ account that has access to the salon.
+2. Set its redirect URL to `http://localhost:4300/api/noona/callback` (the dashboard's own origin;
+   on the Pi, add `http://<pi-address>/api/noona/callback` and set `Dashboard:Noona:RedirectUri` to match).
+3. Under **Scopes**, select `events:read` and `event_types:read` (`user:read` and `companies:read` are
+   mandatory) and click **Save**. Until you save, Noona rejects every scope.
+4. Put the Client ID and Secret in `appsettings.Local.json` under `Dashboard:Noona`, then restart the API.
+5. On the computer running the dashboard, click **Conectar ao Noona** on the clients tile and log in.
+   The API stores the tokens encrypted (ASP.NET Data Protection) in `App_Data/noona-tokens.bin`,
+   renews them automatically, and finds the company from the logged-in user (override with
+   `Dashboard:Noona:CompanyId`; filter to one person with `Dashboard:Noona:EmployeeId`).
+
+The tile shows the next bookings in the coming 8 days. Client names are shortened to first name + initial
+on screen unless `Dashboard:Noona:ShowFullNames` is `true`.
+`POST /api/noona/disconnect` forgets the tokens.
+
+### Google Routes (drive time)
+
+1. In Google Cloud, enable the **Routes API** on a project with billing, then create an API key.
+   Restrict the key to the Routes API only.
+2. Put the key in `appsettings.Local.json` under `Dashboard:Commute:GoogleApiKey` and restart the API.
+3. Each request is billed. The server caches the drive time for 10 minutes between 06:00 and 22:00
+   and for 60 minutes overnight (`RefreshMinutes`, `NightRefreshMinutes`). That is about 100 requests
+   a day however many screens are open. To be safe, also set a daily quota cap on the Routes API in
+   the Cloud console.
+4. "Usual" is the median of our own past readings for that hour and kind of day, kept in
+   `App_Data/commute-history.json`. Until there are a few days of readings, the tile compares against
+   the no-traffic time instead.
 
 There are no accounts: anyone on the network can edit the shopping list and upload or delete photos.
 Keep the API reachable only on the LAN.

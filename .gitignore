@@ -483,3 +483,6 @@ $RECYCLE.BIN/
 
 # Dashboard runtime data (shopping list, uploaded photos)
 App_Data/
+
+# Household-specific config (exact address coordinates, API keys)
+appsettings.Local.json

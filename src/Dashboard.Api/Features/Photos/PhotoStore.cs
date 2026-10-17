@@ -14,7 +14,7 @@ public sealed record PhotoList(IReadOnlyList<Photo> Photos, int RotateSeconds);
 public sealed class PhotoStore(DataDirectory dataDirectory)
 {
     public const long MaxBytes = 25 * 1024 * 1024;
-    public const int RotateSeconds = 15;
+    public const int RotateSeconds = 5;
 
     private static readonly Dictionary<string, string> ContentTypes = new(StringComparer.OrdinalIgnoreCase)
     {

@@ -19,13 +19,13 @@ public static class DashboardEndpoints
     {
         var api = app.MapGroup("/api");
 
-        api.MapGet("/config", (IOptions<DashboardOptions> o) => new
+        api.MapGet("/config", (IOptions<DashboardOptions> o, IntegrationStatus status) => new
         {
             o.Value.LocationName,
             o.Value.TimeZone,
-            o.Value.UseMockData,
+            status.MockWidgets,
             People = o.Value.People.Select(p => new { p.Id, p.Name, p.Color }),
-            BusStops = o.Value.BusStops.Select(s => new { s.Id, s.Name, s.WalkMinutes }),
+            BusStops = o.Value.BusStops.Select(s => new { s.Id, s.Name, s.Code, s.WalkMinutes }),
         });
 
         // Read-only widgets are cached server-side so every open screen (wall, tablets, laptops)
@@ -41,16 +41,31 @@ public static class DashboardEndpoints
                 ? Results.Ok(await Cached(c, $"calendar:{personId}", TimeSpan.FromMinutes(5), t => p.GetAgendaAsync(personId, 7, t), ct))
                 : Results.NotFound());
 
-        api.MapGet("/appointments", (IAppointmentProvider p, HybridCache c, CancellationToken ct) =>
-            Cached(c, "appointments", TimeSpan.FromMinutes(2), p.GetUpcomingAsync, ct));
+        api.MapGet("/appointments", async (IAppointmentProvider p, HybridCache c, CancellationToken ct) =>
+        {
+            try
+            {
+                return Results.Ok(await Cached(c, "appointments", TimeSpan.FromMinutes(2), p.GetUpcomingAsync, ct));
+            }
+            catch (NoonaNotConnectedException ex)
+            {
+                // 409 tells the tile to show its "Conectar ao Noona" button instead of an error.
+                return Results.Problem(ex.Message, statusCode: StatusCodes.Status409Conflict,
+                    extensions: new Dictionary<string, object?> { ["connectUrl"] = "/api/noona/connect" });
+            }
+        });
+        api.MapNoona();
 
         api.MapGet("/transit/{stopId}", async (string stopId, ITransitProvider p, IOptions<DashboardOptions> o, HybridCache c, CancellationToken ct) =>
             o.Value.BusStops.Any(x => x.Id == stopId)
                 ? Results.Ok(await Cached(c, $"transit:{stopId}", TimeSpan.FromSeconds(30), t => p.GetStopBoardAsync(stopId, t), ct))
                 : Results.NotFound());
 
-        api.MapGet("/commute", (ICommuteProvider p, HybridCache c, CancellationToken ct) =>
-            Cached(c, "commute", TimeSpan.FromMinutes(2), p.GetEstimateAsync, ct));
+        // Google Routes bills per request, so this TTL (not the screens' polling) sets the call volume.
+        api.MapGet("/commute", (ICommuteProvider p, HybridCache c, LocalClock clock, IOptions<DashboardOptions> o, CancellationToken ct) =>
+            o.Value.Commute.CacheTtl(clock.Now) is var ttl && ttl > TimeSpan.Zero
+                ? Cached(c, "commute", ttl, p.GetEstimateAsync, ct)
+                : p.GetEstimateAsync(ct));
 
         api.MapGet("/city-events", (ICityEventProvider p, HybridCache c, CancellationToken ct) =>
             Cached(c, "city-events", TimeSpan.FromHours(1), p.GetUpcomingAsync, ct));

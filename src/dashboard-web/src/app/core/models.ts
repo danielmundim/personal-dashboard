@@ -5,9 +5,10 @@ export type Accent = 'sky' | 'amber' | 'green' | 'violet' | 'rose' | 'teal';
 export interface DashboardConfig {
   locationName: string;
   timeZone: string;
-  useMockData: boolean;
+  /** Widgets still served from sample data (see Dashboard:Integrations in the API). */
+  mockWidgets: string[];
   people: { id: string; name: string; color: Accent }[];
-  busStops: { id: string; name: string; walkMinutes: number }[];
+  busStops: { id: string; name: string; code: string; walkMinutes: number }[];
 }
 
 export type WeatherCondition =
@@ -81,12 +82,20 @@ export interface CalendarEvent {
   end: string;
   allDay: boolean;
   location: string | null;
+  /** Feed name, e.g. "Pessoal" or "Trabalho". */
+  source: string | null;
+  /** Busy-only feed: title is "Ocupado" and there's no location. */
+  busy: boolean;
 }
 
 export interface CalendarAgenda {
   personId: string;
   events: CalendarEvent[];
   updatedAt: string;
+  /** False when this person has no calendar links configured yet. */
+  configured: boolean;
+  /** Feeds that couldn't be read on the last refresh. */
+  failedSources: string[] | null;
 }
 
 export interface AppointmentList {
@@ -107,8 +116,23 @@ export interface AppointmentList {
 export interface StopBoard {
   stopId: string;
   stopName: string;
+  stopCode: string;
   walkMinutes: number;
-  departures: { line: string; destination: string; minutesAway: number; realTime: boolean; delayed: boolean }[];
+  lines: string[];
+  departures: {
+    line: string;
+    destination: string;
+    minutesAway: number;
+    realTime: boolean;
+    delayed: boolean;
+    /** Best estimate (live when available); the countdown is computed from this every second. */
+    arrivesAt: string | null;
+    /** Timetable time, to compare with other apps. */
+    scheduledAt: string | null;
+    delayMinutes: number;
+    color: string | null;
+    textColor: string | null;
+  }[];
   updatedAt: string;
 }
 
@@ -117,6 +141,8 @@ export interface DriveEstimate {
   destination: string;
   currentMinutes: number;
   usualMinutes: number;
+  /** history = our median for this hour; freeFlow = no-traffic time until there is enough history. */
+  usualSource: 'history' | 'freeFlow';
   distanceKm: number;
   via: string;
   traffic: 'light' | 'moderate' | 'heavy';

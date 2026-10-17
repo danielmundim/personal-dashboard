@@ -24,13 +24,17 @@ public sealed class MockTransitProvider(LocalClock clock, IOptions<DashboardOpti
             .SelectMany(s => Enumerable.Range(0, 3).Select(k =>
             {
                 var next = (s.Every - (minuteOfDay + s.Offset) % s.Every) % s.Every + k * s.Every;
-                return new Departure(s.Line, s.Destination, next, RealTime: next <= 20, Delayed: s.Line == "906" && k == 0);
+                var delay = s.Line == "906" && k == 0 ? 4 : 0;
+                var arrives = clock.Now.AddMinutes(next);
+                return new Departure(s.Line, s.Destination, next, RealTime: next <= 20, Delayed: delay > 0,
+                    ArrivesAt: arrives, ScheduledAt: arrives.AddMinutes(-delay), DelayMinutes: delay);
             }))
             .Where(d => d.MinutesAway <= 45)
             .OrderBy(d => d.MinutesAway)
             .Take(6)
             .ToList();
 
-        return Task.FromResult(new StopBoard(stop.Id, stop.Name, stop.WalkMinutes, departures, clock.Now));
+        var lines = Schedules[index % Schedules.Length].Select(s => s.Line).Distinct().ToList();
+        return Task.FromResult(new StopBoard(stop.Id, stop.Name, stop.Code, stop.WalkMinutes, lines, departures, clock.Now));
     }
 }

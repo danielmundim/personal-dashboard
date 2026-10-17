@@ -12,6 +12,7 @@ const dayKeyFmt = new Intl.DateTimeFormat('en-CA', { timeZone: TIME_ZONE }); // 
 const dateOnlyWeekdayFmt = new Intl.DateTimeFormat(LOCALE, { weekday: 'long', timeZone: 'UTC' });
 const dateOnlyShortWeekdayFmt = new Intl.DateTimeFormat(LOCALE, { weekday: 'short', timeZone: 'UTC' });
 const dateOnlyMonthShortFmt = new Intl.DateTimeFormat(LOCALE, { month: 'short', timeZone: 'UTC' });
+const dateOnlyDayMonthFmt = new Intl.DateTimeFormat(LOCALE, { day: 'numeric', month: 'long', timeZone: 'UTC' });
 const dayNumFmt = new Intl.DateTimeFormat(LOCALE, { day: '2-digit', timeZone: TIME_ZONE });
 const monthShortFmt = new Intl.DateTimeFormat(LOCALE, { month: 'short', timeZone: TIME_ZONE });
 
@@ -32,6 +33,8 @@ export const fmt = {
   dateOnlyWeekday: (d: string) => capitalize(dateOnlyWeekdayFmt.format(new Date(d))),
   dateOnlyShortWeekday: (d: string) => capitalize(short(dateOnlyShortWeekdayFmt.format(new Date(d)))),
   dateOnlyMonthShort: (d: string) => short(dateOnlyMonthShortFmt.format(new Date(d))),
+  /** "Domingo, 1 de novembro" */
+  dateOnlyFull: (d: string) => `${capitalize(dateOnlyWeekdayFmt.format(new Date(d)))}, ${dateOnlyDayMonthFmt.format(new Date(d))}`,
 };
 
 /** "Hoje", "Amanhã", "Seg 20 out" for an ISO timestamp, relative to now in the household zone. */

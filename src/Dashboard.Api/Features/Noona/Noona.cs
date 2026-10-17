@@ -22,7 +22,7 @@ public sealed record AppointmentList(
     int TodayRemaining,
     DateTimeOffset UpdatedAt);
 
-/// <summary>Future real implementation: Noona HQ API (api.noona.is), bookings for the configured company.</summary>
+/// <summary>Real implementation: <see cref="NoonaAppointmentProvider"/> (Noona HQ API, OAuth 2.0).</summary>
 public interface IAppointmentProvider
 {
     Task<AppointmentList> GetUpcomingAsync(CancellationToken cancellationToken);

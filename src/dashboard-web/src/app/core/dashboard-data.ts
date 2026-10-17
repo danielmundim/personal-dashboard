@@ -25,7 +25,8 @@ export class DashboardData {
   readonly weather = pollingResource<WeatherReport>('/api/weather', 10 * MINUTE);
   readonly holidays = pollingResource<HolidayList>('/api/holidays', 60 * MINUTE);
   readonly appointments = pollingResource<AppointmentList>('/api/appointments', 2 * MINUTE);
-  readonly commute = pollingResource<DriveEstimate>('/api/commute', 2 * MINUTE);
+  // Fetched once per page load (each Google Routes call is billed); refresh the page for a new reading.
+  readonly commute = httpResource<DriveEstimate>(() => '/api/commute');
   readonly cityEvents = pollingResource<CityEventList>('/api/city-events', 60 * MINUTE);
   readonly parties = pollingResource<PartyList>('/api/parties', 10 * MINUTE);
 }

@@ -53,3 +53,18 @@ li {
 }
 
 p { margin: 0; }
+
+li.busy .what strong { font-weight: 400; color: var(--text-muted); font-style: italic; }
+li.busy .bar { background: repeating-linear-gradient(180deg, var(--accent) 0 4px, transparent 4px 7px); }
+
+.warn {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  color: var(--amber);
+  background: color-mix(in srgb, var(--amber) 12%, transparent);
+}
+
+.setup { font-size: 0.85rem; }
+.setup code { font-size: 0.78rem; }

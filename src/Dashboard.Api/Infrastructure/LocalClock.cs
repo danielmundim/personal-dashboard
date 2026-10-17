@@ -18,4 +18,8 @@ public sealed class LocalClock(TimeProvider timeProvider, TimeZoneInfo timeZone)
         var local = day.ToDateTime(new TimeOnly(hour, minute));
         return new DateTimeOffset(local, TimeZone.GetUtcOffset(local));
     }
+
+    /// <summary>Attaches the household zone's offset to a local wall-clock time (e.g. from an API that returns local times).</summary>
+    public DateTimeOffset FromLocal(DateTime local) =>
+        new(DateTime.SpecifyKind(local, DateTimeKind.Unspecified), TimeZone.GetUtcOffset(local));
 }

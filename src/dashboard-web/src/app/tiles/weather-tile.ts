@@ -80,7 +80,10 @@ export class WeatherTile {
       points,
       barW: Math.min(22, step * 0.55),
       line: points.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '),
-      title: `Hoje, ${points[0].label === 'Agora' ? 'agora' : points[0].label + 'h'} – ${fmt.hour(hours[hours.length - 1].time)}h`,
+      title:
+        fmt.dayKey(hours[hours.length - 1].time) === fmt.dayKey(hours[0].time)
+          ? `Hoje, agora – ${fmt.hour(hours[hours.length - 1].time)}h`
+          : `Agora – ${fmt.hour(hours[hours.length - 1].time)}h de amanhã`,
     };
   });
 

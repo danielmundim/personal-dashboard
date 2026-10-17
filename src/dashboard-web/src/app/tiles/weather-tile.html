@@ -83,22 +83,22 @@
       <h3>Próximos 7 dias</h3>
       <ol class="week">
         <li class="week-head" aria-hidden="true">
-          <span></span><span></span><span>Chuva</span><span class="range-head">Mín. / máx.</span><span>Vento</span><span>UV</span>
+          <span></span><span></span><span class="range-head">Mín. / máx.</span><span>Chuva</span><span>Vento</span><span>UV</span>
         </li>
         @for (d of week(); track d.date) {
           <li>
             <span class="day">{{ d.label }}</span>
             <app-icon [name]="weatherIcon(d.condition)" [size]="22" />
+            <span class="range num">
+              <span class="lo">{{ d.minC }}°</span>
+              <span class="track"><span class="fill" [style.left.%]="d.left" [style.width.%]="d.width"></span></span>
+              <span class="hi">{{ d.maxC }}°</span>
+            </span>
             <span class="rain num" [class.wet]="d.precipitationPct >= 50">
               {{ d.precipitationPct }}%
               @if (d.precipitationMm > 0) {
                 <small>{{ d.precipitationMm | number: '1.0-1' }} mm</small>
               }
-            </span>
-            <span class="range num">
-              <span class="lo">{{ d.minC }}°</span>
-              <span class="track"><span class="fill" [style.left.%]="d.left" [style.width.%]="d.width"></span></span>
-              <span class="hi">{{ d.maxC }}°</span>
             </span>
             <span class="num wind">{{ d.windMaxKmh }}<small> km/h</small></span>
             <span class="num uv" [attr.data-uv]="uvLevel(d.uvMax)">{{ d.uvMax }}</span>

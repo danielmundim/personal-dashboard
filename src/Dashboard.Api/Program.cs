@@ -3,6 +3,13 @@ using Dashboard.Api.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Household-specific values (exact home coordinates, API keys) live in a git-ignored file. Environment
+// variables and command-line args are re-added after it so they still win, as usual in ASP.NET Core
+// (e.g. secrets from /etc/dashboard-api.env on the Pi).
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+builder.Configuration.AddEnvironmentVariables();
+builder.Configuration.AddCommandLine(args);
+
 builder.Services.AddOpenApi();
 builder.Services.AddHybridCache();
 builder.Services.AddProblemDetails();

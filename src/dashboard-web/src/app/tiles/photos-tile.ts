@@ -63,7 +63,7 @@ export class PhotosTile {
     // Restart the rotation timer whenever the interval or the photo count changes, or after a manual step.
     let timer: ReturnType<typeof setInterval> | undefined;
     effect(() => {
-      const seconds = valueOf(this.res)?.rotateSeconds ?? 15;
+      const seconds = valueOf(this.res)?.rotateSeconds ?? 5;
       const count = this.photos().length;
       this.index(); // manual navigation resets the countdown
       clearInterval(timer);

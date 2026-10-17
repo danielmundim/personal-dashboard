@@ -140,14 +140,14 @@ h3 {
 
   li {
     display: grid;
-    grid-template-columns: 76px 26px 74px minmax(120px, 1fr) 64px 28px;
+    grid-template-columns: 76px 26px minmax(120px, 1fr) 74px 64px 28px;
     align-items: center;
     gap: 12px;
     padding: 5px 0;
     color: var(--text-muted);
 
     @media (max-width: 560px) {
-      grid-template-columns: 64px 22px 52px 1fr 26px;
+      grid-template-columns: 64px 22px 1fr 52px 26px;
       .wind { display: none; }
     }
   }

@@ -16,8 +16,8 @@
   }
 
   <div class="actions">
-    @if (config()?.useMockData) {
-      <span class="chip" data-tone="amber" title="Os blocos estão mostrando dados de exemplo da API">Dados de exemplo</span>
+    @if (mockSummary(); as m) {
+      <span class="chip" data-tone="amber" [title]="'Ainda com dados de exemplo: ' + m.list">{{ m.count }} {{ m.count === 1 ? 'bloco' : 'blocos' }} com dados de exemplo</span>
     }
     <button type="button" class="icon-btn" (click)="theme.cycle()" [attr.aria-label]="'Tema: ' + themeLabel()" [title]="'Tema: ' + themeLabel()">
       <app-icon [name]="themeIcon()" [size]="18" />
@@ -32,6 +32,9 @@
         <app-icon [name]="g.icon" [size]="18" />
         <span class="label">{{ g.label }}</span>
         <strong>{{ g.value }}</strong>
+        @if (g.detail) {
+          <span class="detail">{{ g.detail }}</span>
+        }
       </div>
     }
   </section>

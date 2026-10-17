@@ -23,9 +23,10 @@ public sealed class MockCommuteProvider(LocalClock clock, IOptions<DashboardOpti
         var commute = options.Value.Commute;
         var estimate = new DriveEstimate(
             commute.Label,
-            commute.DestinationName,
+            commute.Destination.Name,
             current,
             usual,
+            UsualSource.History,
             11.4,
             "VCI · Ponte da Arrábida",
             traffic,

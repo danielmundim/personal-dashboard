@@ -15,17 +15,18 @@ const H = 64;
   imports: [Tile, Icon, DecimalPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <app-tile [title]="e()?.label ?? 'Trajeto'" icon="car" accent="teal" [state]="state()" meta="Waze">
+    <app-tile [title]="e()?.label ?? 'Trajeto'" icon="car" accent="teal" [state]="state()" [meta]="source()">
       @if (e(); as e) {
         <div class="big">
           <strong class="num">{{ e.currentMinutes }}</strong><span>min</span>
           <span class="chip" [attr.data-tone]="tone()">{{ trafficLabel() }}</span>
         </div>
         <p class="delta" [class.worse]="diff() > 0">
-          @if (diff() > 0) { {{ diff() }} min a mais que o normal } @else if (diff() < 0) { {{ -diff() }} min a menos que o normal } @else { Normal para este horário }
+          @if (diff() > 0) { {{ diff() }} min a mais que {{ baseline() }} } @else if (diff() < 0) { {{ -diff() }} min a menos que {{ baseline() }} } @else { Igual {{ baseline() === 'o normal' ? 'ao normal' : 'a sem trânsito' }} }
         </p>
+        <small class="checked muted">Consultado às {{ fmt.time(e.updatedAt) }}</small>
         <dl>
-          <div><dt>Chegada</dt><dd class="num">{{ fmt.time(e.arriveIfLeavingNow) }}</dd></div>
+          <div><dt>Chegada</dt><dd class="num">{{ arrival() }}</dd></div>
           <div><dt>Distância</dt><dd class="num">{{ e.distanceKm | number: '1.1-1' }} km</dd></div>
           <div class="via"><dt>Via</dt><dd>{{ e.via }}</dd></div>
         </dl>
@@ -42,7 +43,9 @@ const H = 64;
               <text [attr.x]="t.x" [attr.y]="h + 13">{{ t.label }}</text>
             }
           </svg>
-          <small class="muted caption">Tempo típico hoje · ponto = agora</small>
+          <small class="muted caption">Tempo típico (histórico) · ponto = agora</small>
+        } @else {
+          <small class="muted caption">A curva do dia aparece depois de alguns dias de leituras.</small>
         }
       }
     </app-tile>
@@ -54,6 +57,7 @@ const H = 64;
     .big .chip { margin-left: auto; align-self: center; }
     .delta { margin: -8px 0 0; font-size: 0.85rem; color: var(--green); font-weight: 500; }
     .delta.worse { color: var(--amber); }
+    .checked { margin-top: -10px; font-size: 0.75rem; }
     dl { display: grid; grid-template-columns: auto auto 1fr; gap: 8px; margin: 0; }
     dl div { display: flex; flex-direction: column; padding: 6px 10px; border-radius: 10px; background: var(--surface-2); min-width: 0; }
     dt { font-size: 0.68rem; color: var(--text-faint); }
@@ -75,7 +79,18 @@ export class CommuteTile {
   protected readonly e = computed(() => valueOf(this.data.commute));
   protected readonly fmt = fmt;
   protected readonly w = W;
+  protected readonly source = computed(() =>
+    (valueOf(this.data.config)?.mockWidgets ?? []).includes('commute') ? 'Exemplo' : 'Google Maps',
+  );
   protected readonly h = H;
+
+  /** Leaving now: the reading can be up to 10 min old, so add its duration to the current time, not the request time. */
+  protected readonly arrival = computed(() => {
+    const e = this.e();
+    return e ? fmt.time(new Date(this.clock.now().getTime() + e.currentMinutes * 60_000)) : '';
+  });
+
+  protected readonly baseline = computed(() => (this.e()?.usualSource === 'freeFlow' ? 'sem trânsito' : 'o normal'));
 
   protected readonly diff = computed(() => {
     const e = this.e();
