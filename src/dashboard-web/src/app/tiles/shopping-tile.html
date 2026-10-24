@@ -1,4 +1,5 @@
 <app-tile title="Lista de compras" icon="cart" accent="green" [state]="state()" [meta]="meta()">
+  <div class="layout">
   <section class="trip">
     <h3>Próxima compra</h3>
     @if (trip().length) {
@@ -18,7 +19,7 @@
         }
       </ul>
     } @else {
-      <p class="empty muted">Nada em falta. Toque nos itens da casa abaixo quando algo acabar.</p>
+      <p class="empty muted">Nada em falta. Toque nos itens que costumamos comprar quando algo acabar.</p>
     }
 
     <div class="actions">
@@ -33,9 +34,9 @@
 
   <section class="household">
     <div class="household-head">
-      <h3>Itens da casa</h3>
+      <h3>Itens que costumamos comprar</h3>
       <button type="button" class="edit" [class.on]="editing()" (click)="editing.set(!editing())"
-              [attr.aria-pressed]="editing()" [title]="editing() ? 'Concluir edição' : 'Editar itens da casa'">
+              [attr.aria-pressed]="editing()" [title]="editing() ? 'Concluir edição' : 'Editar itens habituais'">
         <app-icon [name]="editing() ? 'check' : 'pencil'" [size]="14" />{{ editing() ? 'Concluir' : 'Editar' }}
       </button>
     </div>
@@ -43,12 +44,12 @@
     <form class="add" (submit)="add($event, name)">
       <input #name type="text" placeholder="Procurar ou adicionar item…" maxlength="100" autocomplete="off"
              aria-label="Procurar ou adicionar item" (input)="onInput($event)" />
-      <button type="submit" aria-label="Adicionar aos itens da casa" [disabled]="!isNew()">
+      <button type="submit" aria-label="Adicionar aos itens habituais" [disabled]="!isNew()">
         <app-icon name="plus" [size]="18" />
       </button>
     </form>
     @if (isNew()) {
-      <small class="hint muted">Enter adiciona "{{ query().trim() }}" aos itens da casa.</small>
+      <small class="hint muted">Enter adiciona "{{ query().trim() }}" aos itens que costumamos comprar.</small>
     }
 
     <div class="chips" [class.editing]="editing()">
@@ -70,6 +71,11 @@
     </div>
   </section>
 
+  </div>
+
+  @if (notice()) {
+    <p class="notice">{{ notice() }}</p>
+  }
   @if (error()) {
     <p class="error">{{ error() }}</p>
   }

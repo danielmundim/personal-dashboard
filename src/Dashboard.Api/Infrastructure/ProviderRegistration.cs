@@ -30,6 +30,8 @@ public static class ProviderRegistration
         services.AddSingleton<IHolidayProvider, PortugueseHolidayProvider>();
         services.Configure<ShoppingOptions>(configuration.GetSection(ShoppingOptions.SectionName));
         services.AddSingleton<ShoppingStore>();
+        services.AddSingleton<Dashboard.Api.Features.Stock.StockStore>();
+        services.AddSingleton<Dashboard.Api.Features.Trips.TripStore>();
         services.AddSingleton<PhotoStore>();
 
         // Widgets backed by external services talk through one interface each. Dashboard:Integrations

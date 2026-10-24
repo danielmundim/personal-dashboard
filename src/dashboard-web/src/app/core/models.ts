@@ -216,9 +216,92 @@ export interface Photo {
   url: string;
   sample: boolean;
   addedAt: string;
+  /** Moment or trip the photo belongs to, e.g. "Lisboa 2026". */
+  album: string | null;
+  caption: string | null;
+}
+
+export interface AlbumSummary {
+  name: string;
+  count: number;
+  coverUrl: string;
 }
 
 export interface PhotoList {
   photos: Photo[];
+  albums: AlbumSummary[];
   rotateSeconds: number;
+}
+
+export type StockStatus = 'ok' | 'low' | 'out';
+
+export interface StockItem {
+  id: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  /** Where it's kept: Despensa, Geladeira, Congelador, … */
+  location: string;
+  minQuantity: number | null;
+  /** "yyyy-mm-dd" */
+  expiresOn: string | null;
+  updatedAt: string;
+}
+
+export interface StockView {
+  item: StockItem;
+  status: StockStatus;
+  daysToExpiry: number | null;
+}
+
+export interface StockList {
+  items: StockView[];
+  locations: string[];
+  lowCount: number;
+  expiringCount: number;
+  updatedAt: string;
+}
+
+export interface SaveStockItem {
+  name: string;
+  quantity: number;
+  unit: string | null;
+  location: string | null;
+  minQuantity: number | null;
+  expiresOn: string | null;
+}
+
+export type ChecklistKind = 'comprar' | 'levar' | 'fazer';
+
+export interface ChecklistItem {
+  id: string;
+  text: string;
+  kind: ChecklistKind;
+  done: boolean;
+}
+
+export interface Trip {
+  id: string;
+  name: string;
+  destination: string | null;
+  /** Local calendar days, "yyyy-mm-dd". */
+  startDate: string;
+  endDate: string | null;
+  notes: string | null;
+  checklist: ChecklistItem[];
+  createdAt: string;
+}
+
+export interface TripList {
+  upcoming: Trip[];
+  past: Trip[];
+  updatedAt: string;
+}
+
+export interface SaveTrip {
+  name: string;
+  destination: string | null;
+  startDate: string;
+  endDate: string | null;
+  notes: string | null;
 }

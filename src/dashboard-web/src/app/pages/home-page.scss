@@ -1,0 +1,52 @@
+/* Wall / laptop: 4 columns. Tablet landscape & small laptops: 2. Phone / tablet portrait: 1. */
+
+:host {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-areas:
+    'bus0    bus1    clients  drive'
+    'weather weather cal0     cal1'
+    'photos  photos  shopping holidays'
+    'photos  photos  trip     parties'
+    'events  events  events   events';
+
+  @media (max-width: 1360px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      'bus0     bus1'
+      'drive    clients'
+      'weather  weather'
+      'cal0     cal1'
+      'photos   photos'
+      'shopping trip'
+      'holidays parties'
+      'events   events';
+  }
+
+  @media (max-width: 760px) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'weather' 'drive' 'bus0' 'bus1' 'cal0' 'cal1' 'clients' 'shopping' 'trip' 'photos' 'holidays' 'parties' 'events';
+  }
+
+  > * {
+    display: flex;
+    min-width: 0;
+
+    > ::ng-deep app-tile { flex: 1; }
+  }
+}
+
+.area-weather { grid-area: weather; }
+.area-cal0 { grid-area: cal0; }
+.area-cal1 { grid-area: cal1; }
+.area-bus0 { grid-area: bus0; }
+.area-bus1 { grid-area: bus1; }
+.area-clients { grid-area: clients; }
+.area-drive { grid-area: drive; }
+.area-photos { grid-area: photos; }
+.area-shopping { grid-area: shopping; }
+.area-trip { grid-area: trip; }
+.area-holidays { grid-area: holidays; }
+.area-parties { grid-area: parties; }
+.area-events { grid-area: events; }

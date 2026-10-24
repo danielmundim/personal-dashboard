@@ -1,0 +1,112 @@
+<section class="panel">
+  <div class="toolbar">
+    <input class="search" type="search" placeholder="Procurar no estoque…" aria-label="Procurar no estoque"
+           (input)="query.set($any($event.target).value)" />
+    <button type="button" class="filter" [class.on]="filter() === 'alert'" (click)="filter.set(filter() === 'alert' ? null : 'alert')"
+            [attr.aria-pressed]="filter() === 'alert'">
+      <app-icon name="alert" [size]="14" />Precisa de atenção
+      @if (stock.attentionCount()) {
+        <span class="count">{{ stock.attentionCount() }}</span>
+      }
+    </button>
+    <button type="button" class="primary" (click)="adding.set(!adding())" [attr.aria-expanded]="adding()">
+      <app-icon [name]="adding() ? 'x' : 'plus'" [size]="16" />{{ adding() ? 'Fechar' : 'Adicionar item' }}
+    </button>
+  </div>
+
+  <datalist id="stock-locations">
+    @for (l of stock.locations(); track l) { <option [value]="l"></option> }
+  </datalist>
+  <datalist id="stock-units">
+    @for (u of units; track u) { <option [value]="u"></option> }
+  </datalist>
+
+  <ng-template #fields let-v>
+    <label class="name">Item<input name="name" required maxlength="100" [value]="v?.item.name ?? ''" placeholder="Ex.: Arroz" /></label>
+    <label class="qty">Quantidade<input name="quantity" inputmode="decimal" required [value]="v?.item.quantity ?? 1" /></label>
+    <label class="unit">Unidade<input name="unit" list="stock-units" maxlength="20" [value]="v?.item.unit ?? 'un'" /></label>
+    <label class="loc">Onde fica<input name="location" list="stock-locations" maxlength="40" [value]="v?.item.location ?? 'Despensa'" /></label>
+    <label class="min">Mínimo<input name="minQuantity" inputmode="decimal" [value]="v?.item.minQuantity ?? ''" placeholder="opcional" /></label>
+    <label class="exp">Validade<input name="expiresOn" type="date" [value]="v?.item.expiresOn ?? ''" /></label>
+  </ng-template>
+
+  @if (adding()) {
+    <form class="item-form" #addForm (submit)="save($event, addForm)">
+      <ng-container *ngTemplateOutlet="fields; context: { $implicit: null }" />
+      <div class="form-actions">
+        <button type="submit" class="primary">Adicionar</button>
+        <small class="muted">Se o item já existir no mesmo lugar, a quantidade é somada.</small>
+      </div>
+    </form>
+  }
+
+  @if (notice()) {
+    <p class="notice">{{ notice() }}</p>
+  }
+  @if (stock.error()) {
+    <p class="error">{{ stock.error() }}</p>
+  }
+
+  @if (state() === 'loading') {
+    <p class="muted">Carregando…</p>
+  } @else if (!total()) {
+    <div class="empty">
+      <p>O estoque ainda está vazio.</p>
+      <p class="muted">Adicione o que vocês têm em casa, com a quantidade e onde fica. Com um <b>mínimo</b>, o item avisa quando
+        estiver acabando; com a <b>validade</b>, avisa antes de vencer. Em "Compras feitas", o que foi comprado entra aqui sozinho.</p>
+      @if (!adding()) {
+        <button type="button" class="primary" (click)="adding.set(true)"><app-icon name="plus" [size]="16" />Adicionar o primeiro item</button>
+      }
+    </div>
+  } @else {
+    @for (g of groups(); track g.location) {
+      <div class="group">
+        <h3>{{ g.location }} <span class="muted">{{ g.items.length }}</span></h3>
+        <ul>
+          @for (v of g.items; track v.item.id) {
+            @if (editingId() === v.item.id) {
+              <li class="editing">
+                <form class="item-form" #editForm (submit)="save($event, editForm, v.item.id)">
+                  <ng-container *ngTemplateOutlet="fields; context: { $implicit: v }" />
+                  <div class="form-actions">
+                    <button type="submit" class="primary">Salvar</button>
+                    <button type="button" class="ghost" (click)="editingId.set(null)">Cancelar</button>
+                    <button type="button" class="ghost danger" (click)="remove(v)"><app-icon name="trash" [size]="14" />Remover</button>
+                  </div>
+                </form>
+              </li>
+            } @else {
+              <li [attr.data-status]="v.status">
+                <span class="what">
+                  <strong>{{ v.item.name }}</strong>
+                  @if (badge(v); as b) {
+                    <span class="chip" [attr.data-tone]="b.tone">{{ b.text }}</span>
+                  }
+                  @if (v.item.minQuantity) {
+                    <small class="muted">mín. {{ v.item.minQuantity | number: '1.0-2' }}</small>
+                  }
+                </span>
+                <span class="stepper" role="group" [attr.aria-label]="'Quantidade de ' + v.item.name">
+                  <button type="button" (click)="stock.step(v.item.id, -stepSize(v.item.unit))" [disabled]="v.item.quantity <= 0" aria-label="Diminuir">−</button>
+                  <span class="count num">{{ v.item.quantity | number: '1.0-2' }}<small>{{ v.item.unit }}</small></span>
+                  <button type="button" (click)="stock.step(v.item.id, stepSize(v.item.unit))" aria-label="Aumentar">+</button>
+                </span>
+                <span class="row-actions">
+                  <button type="button" class="icon" [class.suggest]="v.status !== 'ok'" (click)="toShopping(v)"
+                          [title]="'Pôr ' + v.item.name + ' na próxima compra'" [attr.aria-label]="'Pôr ' + v.item.name + ' na próxima compra'">
+                    <app-icon name="cart" [size]="16" />
+                  </button>
+                  <button type="button" class="icon" (click)="editingId.set(v.item.id)" [attr.aria-label]="'Editar ' + v.item.name">
+                    <app-icon name="pencil" [size]="15" />
+                  </button>
+                </span>
+              </li>
+            }
+          }
+        </ul>
+      </div>
+    } @empty {
+      <p class="muted">Nenhum item encontrado.</p>
+    }
+  }
+</section>

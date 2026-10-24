@@ -1,0 +1,144 @@
+<div class="page-head">
+  <h1><app-icon name="plane" [size]="26" />Viagens</h1>
+  @if (editing() !== 'new') {
+    <button type="button" class="primary" (click)="editing.set('new')"><app-icon name="plus" [size]="16" />Nova viagem</button>
+  }
+</div>
+
+@if (error()) {
+  <p class="error">{{ error() }}</p>
+}
+
+<ng-template #tripForm>
+  <form class="trip-form" #f (submit)="save($event, f)">
+    <h2>{{ editing() === 'new' ? 'Nova viagem' : 'Editar viagem' }}</h2>
+    <label class="wide">Nome
+      <input name="name" required maxlength="100" [value]="editingTrip()?.name ?? ''" placeholder="Ex.: Fim de semana em Lisboa" />
+    </label>
+    <label class="wide">Destino
+      <input name="destination" maxlength="100" [value]="editingTrip()?.destination ?? ''" placeholder="Cidade, país" />
+    </label>
+    <label>Ida
+      <input name="startDate" type="date" required [value]="editingTrip()?.startDate ?? ''" />
+    </label>
+    <label>Volta
+      <input name="endDate" type="date" [value]="editingTrip()?.endDate ?? ''" />
+    </label>
+    <label class="wide">Planejamento
+      <textarea name="notes" rows="3" maxlength="4000" placeholder="Voos, hospedagem, ideias…">{{ editingTrip()?.notes ?? '' }}</textarea>
+    </label>
+    <div class="form-actions wide">
+      <button type="submit" class="primary">Salvar</button>
+      <button type="button" class="ghost" (click)="editing.set(null)">Cancelar</button>
+    </div>
+  </form>
+</ng-template>
+
+@if (editing() === 'new') {
+  <ng-container *ngTemplateOutlet="tripForm" />
+}
+
+@if (loading()) {
+  <p class="muted">Carregando…</p>
+} @else if (!upcoming().length && editing() !== 'new') {
+  <section class="empty-state">
+    <p>Nenhuma viagem planejada.</p>
+    <button type="button" class="primary" (click)="editing.set('new')"><app-icon name="plus" [size]="16" />Planejar uma viagem</button>
+  </section>
+}
+
+<div class="trips">
+  @for (t of upcoming(); track t.id) {
+    @if (editing() === t.id) {
+      <ng-container *ngTemplateOutlet="tripForm" />
+    } @else {
+      <article class="trip">
+        <header>
+          <div class="title">
+            <h2>{{ t.name }}</h2>
+            <p class="muted">
+              {{ t.dates }} · {{ t.length }}
+              @if (t.destination) { · <app-icon name="mapPin" [size]="13" />{{ t.destination }} }
+            </p>
+          </div>
+          <div class="countdown num" [class.now]="t.ongoing">
+            @if (t.ongoing) { <b>Agora</b> } @else { <b>{{ t.days }}</b><small>{{ t.days === 1 ? 'dia' : 'dias' }}</small> }
+          </div>
+          <div class="tools">
+            <button type="button" class="ghost small" (click)="editing.set(t.id)"><app-icon name="pencil" [size]="14" />Editar</button>
+            <button type="button" class="ghost small danger" (click)="remove(t)" [attr.aria-label]="'Excluir ' + t.name"><app-icon name="trash" [size]="14" /></button>
+          </div>
+        </header>
+
+        <div class="body">
+          <section class="notes">
+            <h3>Planejamento</h3>
+            <textarea rows="6" maxlength="4000" placeholder="Voos, hospedagem, reservas, ideias…" [value]="t.notes ?? ''"
+                      (blur)="saveNotes(t, $event)" [attr.aria-label]="'Planejamento de ' + t.name"></textarea>
+            <a class="album-link" [routerLink]="'/fotos'" [queryParams]="{ album: t.name }"><app-icon name="image" [size]="14" />Fotos desta viagem</a>
+          </section>
+
+          <section class="checklist">
+            <div class="check-head">
+              <h3>Checklist</h3>
+              @if (t.progress.total) {
+                <span class="muted num">{{ t.progress.done }}/{{ t.progress.total }}</span>
+              }
+            </div>
+            @if (t.progress.total) {
+              <div class="progress"><span [style.width.%]="t.progress.pct"></span></div>
+            }
+
+            @for (g of t.groups; track g.kind) {
+              <div class="group">
+                <h4>{{ g.label }}</h4>
+                <ul>
+                  @for (i of g.items; track i.id) {
+                    <li [class.done]="i.done">
+                      <label>
+                        <input type="checkbox" [checked]="i.done" (change)="toggle(t, i.id, $any($event.target).checked)" />
+                        <span class="box" aria-hidden="true"></span>
+                        <span class="text">{{ i.text }}</span>
+                      </label>
+                      <button type="button" class="remove" (click)="removeItem(t, i.id)" [attr.aria-label]="'Remover ' + i.text">
+                        <app-icon name="x" [size]="13" />
+                      </button>
+                    </li>
+                  }
+                </ul>
+              </div>
+            } @empty {
+              <p class="muted small">O que falta comprar, levar ou resolver antes de ir?</p>
+            }
+
+            <form class="add" (submit)="addItem($event, t, text, kind)">
+              <input #text type="text" maxlength="120" placeholder="Adicionar item…" autocomplete="off" aria-label="Novo item" />
+              <select #kind aria-label="Tipo">
+                @for (k of kinds; track k.kind) { <option [value]="k.kind">{{ k.label }}</option> }
+              </select>
+              <button type="submit" aria-label="Adicionar"><app-icon name="plus" [size]="16" /></button>
+            </form>
+          </section>
+        </div>
+      </article>
+    }
+  }
+</div>
+
+@if (past().length) {
+  <section class="past">
+    <button type="button" class="ghost" (click)="showPast.set(!showPast())" [attr.aria-expanded]="showPast()">
+      <app-icon [name]="showPast() ? 'chevronLeft' : 'chevronRight'" [size]="14" />Viagens passadas ({{ past().length }})
+    </button>
+    @if (showPast()) {
+      <ul>
+        @for (t of past(); track t.id) {
+          <li>
+            <span><strong>{{ t.name }}</strong> <span class="muted">· {{ t.dates }} {{ t.year }}</span></span>
+            <a [routerLink]="'/fotos'" [queryParams]="{ album: t.name }"><app-icon name="image" [size]="14" />Fotos</a>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+}

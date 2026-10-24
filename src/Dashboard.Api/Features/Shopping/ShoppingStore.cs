@@ -67,6 +67,19 @@ public sealed class ShoppingStore(DataDirectory dataDirectory, LocalClock clock,
                 if (items[i].Needed) items[i] = SetNeeded(items[i], false);
         }, ct);
 
+    /// <summary>
+    /// Puts an item on the next trip by name (from the Estoque view). An unknown name also becomes one
+    /// of the usual items, so the next time it's a single tap.
+    /// </summary>
+    public Task<ShoppingList> MarkNeededAsync(string name, CancellationToken ct) =>
+        MutateAsync(items =>
+        {
+            name = name.Trim();
+            var i = items.FindIndex(x => string.Equals(x.Name, name, StringComparison.CurrentCultureIgnoreCase));
+            if (i >= 0) items[i] = SetNeeded(items[i], true);
+            else items.Add(SetNeeded(new ShoppingItem(Guid.NewGuid(), name, 1, false, clock.Now), true));
+        }, ct);
+
     /// <summary>A wa.me link with the trip list pre-filled; WhatsApp opens with the message ready to send.</summary>
     public async Task<WhatsAppMessage> BuildWhatsAppAsync(CancellationToken ct)
     {

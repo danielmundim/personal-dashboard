@@ -55,6 +55,8 @@ public static class DashboardEndpoints
             }
         });
         api.MapNoona();
+        Dashboard.Api.Features.Stock.StockEndpoints.MapStock(api);
+        Dashboard.Api.Features.Trips.TripEndpoints.MapTrips(api);
 
         api.MapGet("/transit/{stopId}", async (string stopId, ITransitProvider p, IOptions<DashboardOptions> o, HybridCache c, CancellationToken ct) =>
             o.Value.BusStops.Any(x => x.Id == stopId)
@@ -91,8 +93,15 @@ public static class DashboardEndpoints
         g.MapPatch("/{id:guid}", (Guid id, UpdateShoppingItem req, ShoppingStore s, CancellationToken ct) => s.UpdateAsync(id, req, ct));
         g.MapDelete("/{id:guid}", (Guid id, ShoppingStore s, CancellationToken ct) => s.RemoveAsync(id, ct));
 
-        // "Compras feitas": empties the trip list, keeps the household items.
-        g.MapPost("/trip/clear", (ShoppingStore s, CancellationToken ct) => s.ClearTripAsync(ct));
+        // "Compras feitas": empties the trip list (the usual items stay) and adds what was bought to the
+        // stock items with the same name, so the Estoque view follows the shopping without extra typing.
+        g.MapPost("/trip/clear", async (ShoppingStore s, Dashboard.Api.Features.Stock.StockStore stock, CancellationToken ct) =>
+        {
+            var bought = (await s.GetAsync(ct)).Items.Where(i => i.Needed).Select(i => (i.Name, i.Quantity)).ToList();
+            var list = await s.ClearTripAsync(ct);
+            var updated = await stock.AddPurchasedAsync(bought, ct);
+            return new { list, stockUpdated = updated };
+        });
 
         // The browser opens this wa.me link; WhatsApp shows the message ready to send (nothing is sent automatically).
         g.MapGet("/whatsapp", (ShoppingStore s, CancellationToken ct) => s.BuildWhatsAppAsync(ct));
@@ -100,16 +109,18 @@ public static class DashboardEndpoints
 
     private static void MapPhotos(RouteGroupBuilder g)
     {
-        g.MapGet("/", (PhotoStore s) => s.List());
+        g.MapGet("/", (PhotoStore s, CancellationToken ct) => s.ListAsync(ct));
 
         // LAN-only dashboard without accounts, so the form upload skips antiforgery tokens.
-        g.MapPost("/", async (IFormFileCollection files, PhotoStore s, CancellationToken ct) =>
+        // Optional form fields "album" and "caption" apply to every file in the upload.
+        g.MapPost("/", async (HttpRequest request, PhotoStore s, CancellationToken ct) =>
             {
-                if (files.Count == 0) return Results.BadRequest("Nenhum arquivo foi enviado.");
+                var form = await request.ReadFormAsync(ct);
+                if (form.Files.Count == 0) return Results.BadRequest("Nenhum arquivo foi enviado.");
                 var saved = new List<Photo>();
                 try
                 {
-                    foreach (var f in files) saved.Add(await s.SaveAsync(f, ct));
+                    foreach (var f in form.Files) saved.Add(await s.SaveAsync(f, form["album"], form["caption"], ct));
                 }
                 catch (BadHttpRequestException ex)
                 {
@@ -119,10 +130,14 @@ public static class DashboardEndpoints
             })
             .DisableAntiforgery();
 
+        g.MapPatch("/{id}", async (string id, UpdatePhoto req, PhotoStore s, CancellationToken ct) =>
+            await s.UpdateAsync(id, req, ct) ? Results.NoContent() : Results.NotFound());
+
         g.MapGet("/{id}", (string id, PhotoStore s) =>
             s.Find(id) is { } f ? Results.File(f.Path, f.ContentType, enableRangeProcessing: true) : Results.NotFound());
 
-        g.MapDelete("/{id}", (string id, PhotoStore s) => s.Delete(id) ? Results.NoContent() : Results.NotFound());
+        g.MapDelete("/{id}", async (string id, PhotoStore s, CancellationToken ct) =>
+            await s.DeleteAsync(id, ct) ? Results.NoContent() : Results.NotFound());
 
         g.MapGet("/samples/{name}", (string name) =>
             SamplePhotos.Get(name) is { } svg ? Results.Content(svg, "image/svg+xml") : Results.NotFound());

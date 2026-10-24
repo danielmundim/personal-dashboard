@@ -2,7 +2,9 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { SECOND } from '../core/dashboard-data';
-import { ShoppingItem, ShoppingList, WhatsAppMessage } from '../core/models';
+import { ShoppingItem, ShoppingList } from '../core/models';
+import { Stock } from '../core/stock';
+import { openShoppingListInWhatsApp } from '../core/whatsapp';
 import { pollingResource } from '../core/polling-resource';
 import { Icon } from '../shared/icon';
 import { Tile } from '../shared/tile';
@@ -102,35 +104,38 @@ export class ShoppingTile {
   }
 
   protected removeFromHousehold(item: ShoppingItem) {
-    if (!confirm(`Remover "${item.name}" dos itens da casa?`)) return;
+    if (!confirm(`Remover "${item.name}" dos itens que costumamos comprar?`)) return;
     this.res.update((l) => l && { ...l, items: l.items.filter((i) => i.id !== item.id) });
     this.apply(this.http.delete<ShoppingList>(`/api/shopping/${item.id}`));
   }
 
+  /** Empties the trip list; the API also adds what was bought to matching items in the Estoque. */
   protected clearTrip() {
-    if (!confirm('Compras feitas? Isto esvazia a lista da próxima compra (os itens da casa ficam).')) return;
-    this.apply(this.http.post<ShoppingList>('/api/shopping/trip/clear', {}));
+    if (!confirm('Compras feitas? A lista da próxima compra é esvaziada e o que foi comprado entra no estoque.')) return;
+    this.http.post<{ list: ShoppingList; stockUpdated: number }>('/api/shopping/trip/clear', {}).subscribe({
+      next: (r) => {
+        this.error.set(null);
+        this.res.set(r.list);
+        this.stock.res.reload(); // the purchases were just added there
+        this.notice.set(
+          r.stockUpdated === 0
+            ? 'Lista esvaziada. Nenhum item comprado estava no estoque.'
+            : `Lista esvaziada. ${r.stockUpdated} ${r.stockUpdated === 1 ? 'item atualizado' : 'itens atualizados'} no estoque.`,
+        );
+        setTimeout(() => this.notice.set(null), 6000);
+      },
+      error: () => this.error.set('Não foi possível concluir. Verifique a conexão e tente de novo.'),
+    });
   }
 
-  /**
-   * Opens WhatsApp with the list ready to send. The window is opened synchronously in the click
-   * handler and pointed at wa.me once the text arrives, otherwise browsers treat it as a popup.
-   */
-  protected sendToWhatsApp() {
-    const win = window.open('', '_blank');
+  protected readonly notice = signal<string | null>(null);
+  private readonly stock = inject(Stock);
+
+  protected async sendToWhatsApp() {
     this.sending.set(true);
-    this.http.get<WhatsAppMessage>('/api/shopping/whatsapp').subscribe({
-      next: (m) => {
-        this.sending.set(false);
-        if (win) win.location.href = m.url;
-        else location.href = m.url;
-      },
-      error: () => {
-        this.sending.set(false);
-        win?.close();
-        this.error.set('Não foi possível preparar a mensagem do WhatsApp.');
-      },
-    });
+    const ok = await openShoppingListInWhatsApp(this.http);
+    this.sending.set(false);
+    if (!ok) this.error.set('Não foi possível preparar a mensagem do WhatsApp.');
   }
 
   private apply(request: Observable<ShoppingList>) {

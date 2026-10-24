@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { MINUTE } from '../core/dashboard-data';
 import { PhotoList } from '../core/models';
 import { pollingResource } from '../core/polling-resource';
+import { RouterLink } from '@angular/router';
 import { Icon } from '../shared/icon';
 import { Tile } from '../shared/tile';
 import { tileState, valueOf } from '../shared/resource-state';
@@ -10,13 +11,18 @@ import { tileState, valueOf } from '../shared/resource-state';
 /** Slideshow of our own photos, uploaded from any device. Cross-fades between two stacked images. */
 @Component({
   selector: 'app-photos-tile',
-  imports: [Tile, Icon],
+  imports: [Tile, Icon, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <app-tile title="Fotos" icon="image" accent="sky" [state]="state()" [meta]="meta()">
       <div class="frame">
         @for (p of photos(); track p.id; let i = $index) {
           <img [src]="p.url" alt="" [class.shown]="i === index()" [attr.loading]="i === index() ? 'eager' : 'lazy'" />
+        }
+        @if (current(); as c) {
+          @if (c.album || c.caption) {
+            <span class="label">{{ c.caption ?? '' }}{{ c.caption && c.album ? ' · ' : '' }}{{ c.album ?? '' }}</span>
+          }
         }
         @if (photos().length > 1) {
           <button type="button" class="nav prev" (click)="step(-1)" aria-label="Foto anterior"><app-icon name="chevronLeft" [size]="20" /></button>
@@ -32,6 +38,7 @@ import { tileState, valueOf } from '../shared/resource-state';
         @if (isSample()) {
           <span class="muted hint">Mostrando imagens de exemplo. Envie suas fotos para substituí-las.</span>
         }
+        <a class="all" routerLink="/fotos">Ver todas</a>
         <label class="upload" [class.busy]="uploading()">
           <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple (change)="upload($event)" [disabled]="uploading()" />
           <app-icon name="upload" [size]="15" />{{ uploading() ? 'Enviando…' : 'Enviar fotos' }}

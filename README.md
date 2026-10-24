@@ -3,6 +3,17 @@
 A glanceable home dashboard for the household. It is built to be opened on tablets and laptops on
 the home network now, and to run on a Raspberry Pi with a wall screen later.
 
+## Tabs
+
+| Tab | What it's for |
+| --- | --- |
+| **Hoje** (`/`) | The daily glance: buses, clients, drive time, weather, calendars, photo slideshow, shopping summary, next trip, holidays, parties, city events |
+| **Fotos** (`/fotos`) | Every uploaded photo, grouped in albums (moments and trips). Upload into an album, filter, and open a photo to edit its caption or album, or delete it |
+| **Viagens** (`/viagens`) | Trips with dates, destination, planning notes and a checklist (Comprar / Levar / Fazer). Stored in `App_Data/trips.json`; each trip links to its photo album |
+| **Compras** (`/compras`) | Two views. **Lista de compras**: the items we usually buy (tap what ran out) and the next supermarket list with quantities and WhatsApp. **Estoque** (`?ver=estoque`): everything we have at home, with quantity, unit, place, optional minimum and expiry |
+
+Navigation is a side rail on wide screens and a bottom bar on phones.
+
 ## Tiles
 
 | Tile | Data today | Planned source |
@@ -61,6 +72,15 @@ drop off by themselves, and edits show up within a minute.
 rules as `parties.json`, plus optional `venue`, `category` (Música, Exposição, Feira, Teatro, Gastronomia…
 each has its own colour), `price` and `url` (makes the card a link). I checked Porto open data,
 porto.pt, Câmara de Gaia, Casa da Música, RA and Viral Agenda, and none has a usable public events feed.
+
+### Stock (Estoque)
+
+`App_Data/stock.json`, edited from Compras → Estoque. Items are grouped by place (Despensa, Geladeira,
+Congelador, Limpeza, Banheiro, or any place you type). − / + adjust quantities (by 0.5 for kg and L).
+An item is flagged **Acabando** at or below its minimum, **Acabou** at 0, and **Vence em N d** / **Vencido**
+near its expiry. The cart button puts it on the next shopping list. **Compras feitas** adds what was
+bought to stock items with the same name. Adding an item that already exists in the same place adds
+to its quantity.
 
 ### Calendars (iCal links)
 

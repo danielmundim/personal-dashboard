@@ -1,3 +1,29 @@
+/* On the Compras tab the tile is wide: stock on the left, next trip on the right. */
+.layout {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+:host(.wide) .layout {
+  @media (min-width: 900px) {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(320px, 1fr);
+    align-items: start;
+    gap: 28px;
+
+    .household { order: -1; padding-top: 0; border-top: 0; }
+    .trip {
+      position: sticky;
+      top: 16px;
+      padding: 16px;
+      border-radius: 14px;
+      background: var(--surface-2);
+    }
+    .chip-item { min-height: 40px; font-size: 0.92rem; }
+  }
+}
+
 h3 {
   margin: 0;
   font-size: 0.78rem;
@@ -219,3 +245,4 @@ section {
 }
 
 .error { margin: 0; font-size: 0.8rem; color: var(--rose); }
+.notice { margin: 0; font-size: 0.82rem; font-weight: 600; color: var(--green); }

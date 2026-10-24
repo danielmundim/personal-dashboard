@@ -1,43 +1,43 @@
-<header class="top">
-  <div class="clock">
-    <div class="time num">{{ clock.time() }}</div>
-    <div class="date">
-      <span class="greeting">{{ clock.greeting() }}</span>
-      <span>{{ clock.date() }}</span>
-    </div>
-  </div>
-
-  @if (weather(); as w) {
-    <div class="now-weather">
-      <app-icon [name]="weatherIcon(w.now.condition)" [size]="36" [stroke]="1.5" />
-      <span class="num">{{ w.now.temperatureC | number: '1.0-0' }}°</span>
-      <span class="muted">{{ w.location }}</span>
-    </div>
+<nav class="tabs" aria-label="Seções">
+  @for (t of tabs; track t.path) {
+    <a [routerLink]="t.path" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: t.path === '/' }"
+       #rla="routerLinkActive" [attr.aria-current]="rla.isActive ? 'page' : null">
+      <app-icon [name]="t.icon" [size]="22" />
+      <span>{{ t.label }}</span>
+    </a>
   }
+  <span class="rail-clock num" aria-hidden="true">{{ clock.time() }}</span>
+</nav>
 
-  <div class="actions">
-    @if (mockSummary(); as m) {
-      <span class="chip" data-tone="amber" [title]="'Ainda com dados de exemplo: ' + m.list">{{ m.count }} {{ m.count === 1 ? 'bloco' : 'blocos' }} com dados de exemplo</span>
+<div class="page">
+  <header class="top">
+    <div class="clock">
+      <div class="time num">{{ clock.time() }}</div>
+      <div class="date">
+        <span class="greeting">{{ clock.greeting() }}</span>
+        <span>{{ clock.date() }}</span>
+      </div>
+    </div>
+
+    @if (weather(); as w) {
+      <div class="now-weather">
+        <app-icon [name]="weatherIcon(w.now.condition)" [size]="36" [stroke]="1.5" />
+        <span class="num">{{ w.now.temperatureC | number: '1.0-0' }}°</span>
+        <span class="muted">{{ w.location }}</span>
+      </div>
     }
-    <button type="button" class="icon-btn" (click)="theme.cycle()" [attr.aria-label]="'Tema: ' + themeLabel()" [title]="'Tema: ' + themeLabel()">
-      <app-icon [name]="themeIcon()" [size]="18" />
-    </button>
-  </div>
-</header>
 
-<main class="grid">
-  <app-weather-tile class="area-weather" />
-  @for (p of people(); track p.id; let i = $index) {
-    <app-calendar-tile [class]="'area-cal' + i" [person]="p" />
-  }
-  @for (s of stops(); track s.id; let i = $index) {
-    <app-bus-tile [class]="'area-bus' + i" [stop]="s" />
-  }
-  <app-appointments-tile class="area-clients" />
-  <app-commute-tile class="area-drive" />
-  <app-photos-tile class="area-photos" />
-  <app-shopping-tile class="area-shopping" />
-  <app-holidays-tile class="area-holidays" />
-  <app-parties-tile class="area-parties" />
-  <app-city-events-tile class="area-events" />
-</main>
+    <div class="actions">
+      @if (mockSummary(); as m) {
+        <span class="chip" data-tone="amber" [title]="'Ainda com dados de exemplo: ' + m.list">{{ m.count }} {{ m.count === 1 ? 'bloco' : 'blocos' }} com dados de exemplo</span>
+      }
+      <button type="button" class="icon-btn" (click)="theme.cycle()" [attr.aria-label]="'Tema: ' + themeLabel()" [title]="'Tema: ' + themeLabel()">
+        <app-icon [name]="themeIcon()" [size]="18" />
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <router-outlet />
+  </main>
+</div>

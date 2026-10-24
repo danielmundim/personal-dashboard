@@ -1,0 +1,73 @@
+<div class="page-head">
+  <h1><app-icon name="image" [size]="26" />Fotos</h1>
+</div>
+
+<section class="upload-panel">
+  <label>Álbum
+    <input #albumInput type="text" maxlength="60" list="albums" [value]="uploadAlbum()" placeholder="Ex.: Lisboa 2026 (opcional)" />
+    <datalist id="albums">
+      @for (a of albums(); track a.name) { <option [value]="a.name"></option> }
+    </datalist>
+  </label>
+  <label>Legenda
+    <input #captionInput type="text" maxlength="200" placeholder="Opcional, vale para todas as fotos enviadas" />
+  </label>
+  <label class="upload-btn" [class.busy]="uploading()">
+    <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple [disabled]="uploading()"
+           (change)="upload($event, albumInput, captionInput)" />
+    <app-icon name="upload" [size]="16" />{{ uploading() ? 'Enviando…' : 'Enviar fotos' }}
+  </label>
+</section>
+
+@if (error()) {
+  <p class="error">{{ error() }}</p>
+}
+@if (isSample()) {
+  <p class="muted">Ainda não há fotos: as imagens abaixo são exemplos e somem quando vocês enviarem as primeiras.</p>
+}
+
+<nav class="albums" aria-label="Álbuns">
+  <button type="button" [class.on]="filter() === null" (click)="select(null)">Todas <span class="n">{{ all().length }}</span></button>
+  @for (a of albums(); track a.name) {
+    <button type="button" class="album" [class.on]="filter()?.toLocaleLowerCase() === a.name.toLocaleLowerCase()" (click)="select(a.name)">
+      <img [src]="a.coverUrl" alt="" loading="lazy" />{{ a.name }} <span class="n">{{ a.count }}</span>
+    </button>
+  }
+  @if (albums().length && withoutAlbum()) {
+    <button type="button" [class.on]="filter() === noAlbum" (click)="select(noAlbum)">Sem álbum <span class="n">{{ withoutAlbum() }}</span></button>
+  }
+</nav>
+
+@if (loading()) {
+  <p class="muted">Carregando…</p>
+} @else {
+  <div class="grid">
+    @for (p of photos(); track p.id; let i = $index) {
+      <button type="button" class="thumb" (click)="show(i)" [attr.aria-label]="p.caption ?? 'Abrir foto'">
+        <img [src]="p.url" alt="" loading="lazy" />
+        @if (p.caption) { <span class="cap">{{ p.caption }}</span> }
+      </button>
+    } @empty {
+      <p class="muted empty">Nenhuma foto neste álbum ainda. Envie as primeiras acima.</p>
+    }
+  </div>
+}
+
+@if (open(); as p) {
+  <div class="viewer" role="dialog" aria-modal="true" aria-label="Foto" (click)="close()">
+    <figure (click)="$event.stopPropagation()">
+      <img [src]="p.url" [alt]="p.caption ?? ''" />
+      @if (!p.sample) {
+        <figcaption>
+          <input #a type="text" maxlength="60" list="albums" [value]="p.album ?? ''" placeholder="Álbum" aria-label="Álbum" />
+          <input #c type="text" maxlength="200" [value]="p.caption ?? ''" placeholder="Legenda" aria-label="Legenda" />
+          <button type="button" class="save" (click)="saveDetails(p, a, c)">Salvar</button>
+          <button type="button" class="delete" (click)="remove(p)" aria-label="Excluir foto"><app-icon name="trash" [size]="16" /></button>
+        </figcaption>
+      }
+    </figure>
+    <button type="button" class="nav prev" (click)="$event.stopPropagation(); step(-1)" aria-label="Foto anterior"><app-icon name="chevronLeft" [size]="24" /></button>
+    <button type="button" class="nav next" (click)="$event.stopPropagation(); step(1)" aria-label="Próxima foto"><app-icon name="chevronRight" [size]="24" /></button>
+    <button type="button" class="close" (click)="close()" aria-label="Fechar"><app-icon name="x" [size]="22" /></button>
+  </div>
+}

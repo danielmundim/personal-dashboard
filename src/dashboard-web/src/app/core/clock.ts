@@ -33,6 +33,8 @@ export const fmt = {
   dateOnlyWeekday: (d: string) => capitalize(dateOnlyWeekdayFmt.format(new Date(d))),
   dateOnlyShortWeekday: (d: string) => capitalize(short(dateOnlyShortWeekdayFmt.format(new Date(d)))),
   dateOnlyMonthShort: (d: string) => short(dateOnlyMonthShortFmt.format(new Date(d))),
+  /** "Ter 29 dez" for a date-only value. */
+  dateOnlyShort: (d: string) => `${fmt.dateOnlyShortWeekday(d)} ${new Date(d).getUTCDate()} ${fmt.dateOnlyMonthShort(d)}`,
   /** "Domingo, 1 de novembro" */
   dateOnlyFull: (d: string) => `${capitalize(dateOnlyWeekdayFmt.format(new Date(d)))}, ${dateOnlyDayMonthFmt.format(new Date(d))}`,
 };

@@ -98,3 +98,29 @@
 .delete:hover { color: var(--rose); }
 
 .error { margin: 0; font-size: 0.8rem; color: var(--rose); }
+
+.label {
+  position: absolute;
+  left: 14px;
+  bottom: 30px;
+  max-width: calc(100% - 28px);
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #fff;
+  background: rgb(0 0 0 / 45%);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.all {
+  margin-left: auto;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--sky);
+  text-decoration: none;
+
+  + .upload { margin-left: 0; }
+}
