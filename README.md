@@ -9,7 +9,7 @@ the home network now, and to run on a Raspberry Pi with a wall screen later.
 | --- | --- |
 | **Hoje** (`/`) | The daily glance: buses, clients, drive time, weather, calendars, photo slideshow, shopping summary, next trip, holidays, parties, city events |
 | **Fotos** (`/fotos`) | Every uploaded photo, grouped in albums (moments and trips). Upload into an album, filter, and open a photo to edit its caption or album, or delete it |
-| **Viagens** (`/viagens`) | Trips with dates, destination, planning notes and a checklist (Comprar / Levar / Fazer). Stored in `App_Data/trips.json`; each trip links to its photo album |
+| **Viagens** (`/viagens`) | Trips with a start date and an optional return ("volta em aberto"), an ordered itinerary of destinations (each with optional arrival/departure dates, how you get there from the previous one, and notes; reorder with ↑ / ↓), planning notes and a checklist (Comprar / Levar / Fazer). Stored in `App_Data/trips.json`; each trip links to its photo album |
 | **Compras** (`/compras`) | Two views. **Lista de compras**: the items we usually buy (tap what ran out) and the next supermarket list with quantities and WhatsApp. **Estoque** (`?ver=estoque`): everything we have at home, with quantity, unit, place, optional minimum and expiry |
 
 Navigation is a side rail on wide screens and a bottom bar on phones.

@@ -5,6 +5,7 @@ import { SECOND } from './dashboard-data';
 import { SaveStockItem, StockList, StockView } from './models';
 import { pollingResource } from './polling-resource';
 import { valueOf } from '../shared/resource-state';
+import { saveErrorMessage } from './save-error';
 
 /**
  * The household inventory, shared by the Estoque view and the shopping card on Hoje. Every change
@@ -81,8 +82,8 @@ export class Stock {
           this.res.set(list);
           resolve(true);
         },
-        error: () => {
-          this.error.set('Não foi possível salvar. Verifique a conexão e tente de novo.');
+        error: (e) => {
+          this.error.set(saveErrorMessage(e));
           this.res.reload();
           resolve(false);
         },

@@ -280,14 +280,42 @@ export interface ChecklistItem {
   done: boolean;
 }
 
+/** How we get to a stop from the previous one (or from home, for the first). */
+export type Transport = 'aviao' | 'comboio' | 'onibus' | 'carro' | 'barco' | 'outro';
+
+/** One destination in a trip's itinerary; dates are optional (we often decide the next jump on the way). */
+export interface TripStop {
+  id: string;
+  place: string;
+  arrive: string | null;
+  depart: string | null;
+  transport: Transport | null;
+  notes: string | null;
+  /** What's already booked for this stop. */
+  outboundTicket: boolean;
+  lodging: boolean;
+}
+
+export type StopBooking = 'outboundTicket' | 'lodging';
+
+export interface SaveStop {
+  place: string;
+  arrive: string | null;
+  depart: string | null;
+  transport: Transport | null;
+  notes: string | null;
+}
+
 export interface Trip {
   id: string;
   name: string;
-  destination: string | null;
   /** Local calendar days, "yyyy-mm-dd". */
   startDate: string;
+  /** The return; null while the trip is open-ended. */
   endDate: string | null;
   notes: string | null;
+  /** Itinerary in travel order. */
+  stops: TripStop[];
   checklist: ChecklistItem[];
   createdAt: string;
 }
@@ -300,7 +328,6 @@ export interface TripList {
 
 export interface SaveTrip {
   name: string;
-  destination: string | null;
   startDate: string;
   endDate: string | null;
   notes: string | null;

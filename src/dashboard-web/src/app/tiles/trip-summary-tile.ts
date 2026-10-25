@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Clock, daysUntil, fmt } from '../core/clock';
-import { Trips, progress } from '../core/trips';
+import { Trips, progress, routeLine } from '../core/trips';
 import { Icon } from '../shared/icon';
 import { Tile } from '../shared/tile';
 import { tileState } from '../shared/resource-state';
@@ -17,7 +17,8 @@ import { tileState } from '../shared/resource-state';
         <a class="head" routerLink="/viagens">
           <span class="what">
             <strong>{{ t.name }}</strong>
-            <small>{{ t.dates }}@if (t.destination) { · {{ t.destination }} }</small>
+            <small>{{ t.dates }}</small>
+            @if (t.route) { <small class="route">{{ t.route }}</small> }
           </span>
           <span class="days num">
             @if (t.ongoing) { <b>Agora</b> } @else { <b>{{ t.days }}</b><small>{{ t.days === 1 ? 'dia' : 'dias' }}</small> }
@@ -47,6 +48,7 @@ import { tileState } from '../shared/resource-state';
     .what { display: flex; flex-direction: column; min-width: 0; }
     .what strong { font-size: 1.05rem; font-weight: 600; }
     .what small { color: var(--text-faint); font-size: 0.78rem; }
+    .what .route { color: var(--teal); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .days { display: flex; flex-direction: column; align-items: flex-end; line-height: 1; }
     .days b { font-size: 2.2rem; font-weight: 600; letter-spacing: -0.03em; color: var(--teal); }
     .days small { font-size: 0.72rem; color: var(--text-faint); }
@@ -73,7 +75,8 @@ export class TripSummaryTile {
       ...t,
       days,
       ongoing: days <= 0,
-      dates: t.endDate ? `${fmt.dateOnlyShort(t.startDate)} – ${fmt.dateOnlyShort(t.endDate)}` : fmt.dateOnlyShort(t.startDate),
+      dates: t.endDate ? `${fmt.dateOnlyShort(t.startDate)} – ${fmt.dateOnlyShort(t.endDate)}` : `${fmt.dateOnlyShort(t.startDate)} · volta em aberto`,
+      route: routeLine(t),
       progress: progress(t),
       pending: t.checklist.filter((i) => !i.done).slice(0, 3),
     };

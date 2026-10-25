@@ -20,6 +20,22 @@ public static class TripEndpoints
 
         g.MapDelete("/{id:guid}", async (Guid id, TripStore s, CancellationToken ct) => Results.Ok((await s.DeleteAsync(id, ct)).List));
 
+        // Itinerary: ordered stops (cities/countries), each optionally dated and with how we get there.
+        g.MapPost("/{id:guid}/stops", async (Guid id, SaveStop req, TripStore s, CancellationToken ct) =>
+            InvalidStop(req) is { } problem ? problem : Found(await s.AddStopAsync(id, req, ct)));
+
+        g.MapPut("/{id:guid}/stops/{stopId:guid}", async (Guid id, Guid stopId, SaveStop req, TripStore s, CancellationToken ct) =>
+            InvalidStop(req) is { } problem ? problem : Found(await s.UpdateStopAsync(id, stopId, req, ct)));
+
+        g.MapPatch("/{id:guid}/stops/{stopId:guid}/bookings", async (Guid id, Guid stopId, UpdateStopBookings req, TripStore s, CancellationToken ct) =>
+            Found(await s.UpdateStopBookingsAsync(id, stopId, req, ct)));
+
+        g.MapPost("/{id:guid}/stops/{stopId:guid}/move", async (Guid id, Guid stopId, MoveStop req, TripStore s, CancellationToken ct) =>
+            Found(await s.MoveStopAsync(id, stopId, req.Index, ct)));
+
+        g.MapDelete("/{id:guid}/stops/{stopId:guid}", async (Guid id, Guid stopId, TripStore s, CancellationToken ct) =>
+            Found(await s.DeleteStopAsync(id, stopId, ct)));
+
         g.MapPost("/{id:guid}/items", async (Guid id, AddChecklistItem req, TripStore s, CancellationToken ct) =>
             string.IsNullOrWhiteSpace(req.Text) || req.Text.Length > 120
                 ? Results.ValidationProblem(new Dictionary<string, string[]> { ["text"] = ["Descreva o item (máx. 120 caracteres)."] })
@@ -34,6 +50,15 @@ public static class TripEndpoints
 
     private static IResult Found((TripList List, Trip? Trip) result) =>
         result.Trip is null ? Results.NotFound() : Results.Ok(result.List);
+
+    private static IResult? InvalidStop(SaveStop r)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (string.IsNullOrWhiteSpace(r.Place) || r.Place.Length > 100) errors["place"] = ["Informe o destino (máx. 100 caracteres)."];
+        if (r.Arrive is { } a && r.Depart is { } d && d < a) errors["depart"] = ["A saída não pode ser antes da chegada."];
+        if ((r.Notes?.Length ?? 0) > 1000) errors["notes"] = ["As notas podem ter até 1000 caracteres."];
+        return errors.Count > 0 ? Results.ValidationProblem(errors) : null;
+    }
 
     private static IResult? Invalid(SaveTrip r)
     {

@@ -15,15 +15,13 @@
     <label class="wide">Nome
       <input name="name" required maxlength="100" [value]="editingTrip()?.name ?? ''" placeholder="Ex.: Fim de semana em Lisboa" />
     </label>
-    <label class="wide">Destino
-      <input name="destination" maxlength="100" [value]="editingTrip()?.destination ?? ''" placeholder="Cidade, país" />
-    </label>
     <label>Ida
       <input name="startDate" type="date" required [value]="editingTrip()?.startDate ?? ''" />
     </label>
-    <label>Volta
+    <label>Volta <span class="opt">opcional</span>
       <input name="endDate" type="date" [value]="editingTrip()?.endDate ?? ''" />
     </label>
+    <p class="wide hint muted">Os destinos (cidades ou países) e a ordem entre eles ficam no roteiro de cada viagem. Sem data de volta, a viagem fica "em aberto".</p>
     <label class="wide">Planejamento
       <textarea name="notes" rows="3" maxlength="4000" placeholder="Voos, hospedagem, ideias…">{{ editingTrip()?.notes ?? '' }}</textarea>
     </label>
@@ -56,19 +54,112 @@
         <header>
           <div class="title">
             <h2>{{ t.name }}</h2>
-            <p class="muted">
-              {{ t.dates }} · {{ t.length }}
-              @if (t.destination) { · <app-icon name="mapPin" [size]="13" />{{ t.destination }} }
-            </p>
+            <p class="muted">{{ t.dates }}@if (t.length) { · {{ t.length }} }</p>
+            @if (t.route) {
+              <p class="route"><app-icon name="mapPin" [size]="13" />{{ t.route }}</p>
+            }
           </div>
           <div class="countdown num" [class.now]="t.ongoing">
-            @if (t.ongoing) { <b>Agora</b> } @else { <b>{{ t.days }}</b><small>{{ t.days === 1 ? 'dia' : 'dias' }}</small> }
+            @if (t.tripDays) {
+              <b>{{ t.tripDays }}</b><small>{{ t.tripDays === 1 ? 'dia de viagem' : 'dias de viagem' }}</small>
+            }
+            <span class="starts">
+              @if (t.ongoing) { Acontecendo agora }
+              @else if (t.days === 1) { Começa amanhã }
+              @else { Começa em {{ t.days }} dias }
+            </span>
           </div>
           <div class="tools">
             <button type="button" class="ghost small" (click)="editing.set(t.id)"><app-icon name="pencil" [size]="14" />Editar</button>
             <button type="button" class="ghost small danger" (click)="remove(t)" [attr.aria-label]="'Excluir ' + t.name"><app-icon name="trash" [size]="14" /></button>
           </div>
         </header>
+
+        <ng-template #stopFields let-s>
+          <label class="place">Destino<input name="place" required maxlength="100" [value]="s?.place ?? ''" placeholder="Cidade ou país" /></label>
+          <label>Chegada<input name="arrive" type="date" [value]="s?.arrive ?? ''" /></label>
+          <label>Saída<input name="depart" type="date" [value]="s?.depart ?? ''" /></label>
+          <label>Como chegar
+            <select name="transport">
+              <option value="" [selected]="!s?.transport">—</option>
+              @for (tr of transports; track tr.value) {
+                <option [value]="tr.value" [selected]="s?.transport === tr.value">{{ tr.symbol }} {{ tr.label }}</option>
+              }
+            </select>
+          </label>
+          <label class="stop-notes">Notas<input name="notes" maxlength="1000" [value]="s?.notes ?? ''" placeholder="Hospedagem, reserva, ideias…" /></label>
+        </ng-template>
+
+        <section class="itinerary">
+          <div class="check-head">
+            <h3>Roteiro</h3>
+            @if (t.hasDateWarning) { <span class="date-warn"><app-icon name="alert" [size]="13" />Há datas fora de ordem: o total de dias pode estar errado</span> }
+            @if (t.stops.length) { <span class="muted num">{{ t.stops.length }} {{ t.stops.length === 1 ? 'destino' : 'destinos' }}</span> }
+          </div>
+          @if (t.stopViews.length) {
+            <ol class="stops">
+              @for (s of t.stopViews; track s.id; let i = $index; let first = $first; let last = $last) {
+                @if (!first) {
+                  <li class="leg" aria-hidden="true">
+                    <span class="line"></span>
+                    <span class="how">{{ transportOf(s.transport)?.symbol ?? '→' }} {{ transportOf(s.transport)?.label ?? 'Como chegar: a definir' }}</span>
+                  </li>
+                }
+                @if (editingStop() === t.id + ':' + s.id) {
+                  <li class="stop editing">
+                    <form class="stop-form" #sf (submit)="saveStop($event, sf, t, s.id)">
+                      <ng-container *ngTemplateOutlet="stopFields; context: { $implicit: s }" />
+                      <div class="form-actions">
+                        <button type="submit" class="primary small">Salvar</button>
+                        <button type="button" class="ghost small" (click)="editingStop.set(null)">Cancelar</button>
+                        <button type="button" class="ghost small danger" (click)="removeStop(t, s)"><app-icon name="trash" [size]="13" />Tirar do roteiro</button>
+                      </div>
+                    </form>
+                  </li>
+                } @else {
+                  <li class="stop" [class.warn]="s.outOfOrder">
+                    <span class="n num">{{ i + 1 }}</span>
+                    <span class="what">
+                      <strong>{{ s.place }}</strong>
+                      <small>{{ s.when }}@if (s.nights) { · {{ s.nights }} }@if (first && s.transport) { · {{ transportOf(s.transport)?.symbol }} {{ transportOf(s.transport)?.label }} }</small>
+                      @if (s.notes) { <small class="notes-line">{{ s.notes }}</small> }
+                      @if (s.outOfOrder) {
+                        <small class="date-warn"><app-icon name="alert" [size]="12" />Data antes do destino anterior. Confira o ano?</small>
+                      }
+                      <span class="bookings">
+                        @for (b of s.bookings; track b.key) {
+                          <label class="booking" [class.done]="s[b.key]">
+                            <input type="checkbox" [checked]="s[b.key]" (change)="setBooking(t, s, b.key, $any($event.target).checked)" />
+                            <span class="box" aria-hidden="true"></span>{{ b.label }}
+                          </label>
+                        }
+                      </span>
+                    </span>
+                    <span class="order">
+                      <button type="button" class="icon" (click)="moveStop(t, i, -1)" [disabled]="first" [attr.aria-label]="'Subir ' + s.place">↑</button>
+                      <button type="button" class="icon" (click)="moveStop(t, i, 1)" [disabled]="last" [attr.aria-label]="'Descer ' + s.place">↓</button>
+                      <button type="button" class="icon" (click)="editingStop.set(t.id + ':' + s.id)" [attr.aria-label]="'Editar ' + s.place"><app-icon name="pencil" [size]="14" /></button>
+                    </span>
+                  </li>
+                }
+              }
+            </ol>
+          } @else {
+            <p class="muted small">Adicione as cidades ou países na ordem em que vão passar por eles.</p>
+          }
+
+          @if (editingStop() === t.id + ':new') {
+            <form class="stop-form adding" #nf (submit)="saveStop($event, nf, t)">
+              <ng-container *ngTemplateOutlet="stopFields; context: { $implicit: null }" />
+              <div class="form-actions">
+                <button type="submit" class="primary small">Adicionar ao roteiro</button>
+                <button type="button" class="ghost small" (click)="editingStop.set(null)">Fechar</button>
+              </div>
+            </form>
+          } @else {
+            <button type="button" class="ghost small add-stop" (click)="editingStop.set(t.id + ':new')"><app-icon name="plus" [size]="14" />Adicionar destino</button>
+          }
+        </section>
 
         <div class="body">
           <section class="notes">

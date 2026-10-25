@@ -2,9 +2,10 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { MINUTE } from './dashboard-data';
-import { ChecklistKind, SaveTrip, Trip, TripList } from './models';
+import { ChecklistKind, SaveStop, SaveTrip, StopBooking, Trip, TripList, Transport } from './models';
 import { pollingResource } from './polling-resource';
 import { valueOf } from '../shared/resource-state';
+import { saveErrorMessage } from './save-error';
 
 /**
  * Trips shared by the Viagens tab and the "Próxima viagem" card on Hoje. Every change returns the
@@ -30,6 +31,45 @@ export class Trips {
 
   remove(id: string) {
     return this.apply(this.http.delete<TripList>(`/api/trips/${id}`));
+  }
+
+  addStop(tripId: string, stop: SaveStop) {
+    return this.apply(this.http.post<TripList>(`/api/trips/${tripId}/stops`, stop));
+  }
+
+  updateStop(tripId: string, stopId: string, stop: SaveStop) {
+    return this.apply(this.http.put<TripList>(`/api/trips/${tripId}/stops/${stopId}`, stop));
+  }
+
+  /** Moves a stop to a new position; the list updates on screen first so ↑ / ↓ feel instant. */
+  moveStop(tripId: string, stopId: string, index: number) {
+    this.res.update((l) => l && {
+      ...l,
+      upcoming: l.upcoming.map((t) => {
+        if (t.id !== tripId) return t;
+        const stops = t.stops.filter((s) => s.id !== stopId);
+        const moved = t.stops.find((s) => s.id === stopId);
+        if (!moved) return t;
+        stops.splice(Math.max(0, Math.min(index, stops.length)), 0, moved);
+        return { ...t, stops };
+      }),
+    });
+    return this.apply(this.http.post<TripList>(`/api/trips/${tripId}/stops/${stopId}/move`, { index }));
+  }
+
+  /** Ticks "Passagem ida" or "Hospedagem" on a stop, optimistically like the checklist. */
+  setBooking(tripId: string, stopId: string, booking: StopBooking, done: boolean) {
+    this.res.update((l) => l && {
+      ...l,
+      upcoming: l.upcoming.map((t) =>
+        t.id !== tripId ? t : { ...t, stops: t.stops.map((s) => (s.id === stopId ? { ...s, [booking]: done } : s)) },
+      ),
+    });
+    return this.apply(this.http.patch<TripList>(`/api/trips/${tripId}/stops/${stopId}/bookings`, { [booking]: done }));
+  }
+
+  removeStop(tripId: string, stopId: string) {
+    return this.apply(this.http.delete<TripList>(`/api/trips/${tripId}/stops/${stopId}`));
   }
 
   addItem(tripId: string, text: string, kind: ChecklistKind) {
@@ -59,14 +99,39 @@ export class Trips {
           this.res.set(list);
           resolve(true);
         },
-        error: () => {
-          this.error.set('Não foi possível salvar. Verifique a conexão e tente de novo.');
+        error: (e) => {
+          this.error.set(saveErrorMessage(e));
           this.res.reload();
           resolve(false);
         },
       }),
     );
   }
+}
+
+export const TRANSPORTS: { value: Transport; label: string; symbol: string }[] = [
+  { value: 'aviao', label: 'Avião', symbol: '✈' },
+  { value: 'comboio', label: 'Comboio', symbol: '🚆' },
+  { value: 'onibus', label: 'Ônibus', symbol: '🚌' },
+  { value: 'carro', label: 'Carro', symbol: '🚗' },
+  { value: 'barco', label: 'Barco', symbol: '⛴' },
+  { value: 'outro', label: 'Outro', symbol: '→' },
+];
+
+export const BOOKINGS: { key: StopBooking; label: string }[] = [
+  { key: 'outboundTicket', label: 'Passagem ida' },
+  { key: 'lodging', label: 'Hospedagem' },
+];
+
+export function transportOf(t: Transport | null) {
+  return TRANSPORTS.find((x) => x.value === t) ?? null;
+}
+
+/** "Porto ✈ Salvador 🚌 Ituberá": the itinerary in one line, each stop joined by how we get there. */
+export function routeLine(trip: Trip) {
+  return trip.stops
+    .map((s, i) => (i === 0 ? s.place : `${transportOf(s.transport)?.symbol ?? '→'} ${s.place}`))
+    .join(' ');
 }
 
 /** Checklist progress, e.g. { done: 3, total: 8, pct: 38 }. */
