@@ -57,6 +57,7 @@ public static class DashboardEndpoints
         api.MapNoona();
         Dashboard.Api.Features.Stock.StockEndpoints.MapStock(api);
         Dashboard.Api.Features.Trips.TripEndpoints.MapTrips(api);
+        Dashboard.Api.Features.Books.BookEndpoints.MapBooks(api);
 
         api.MapGet("/transit/{stopId}", async (string stopId, ITransitProvider p, IOptions<DashboardOptions> o, HybridCache c, CancellationToken ct) =>
             o.Value.BusStops.Any(x => x.Id == stopId)

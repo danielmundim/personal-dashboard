@@ -1,0 +1,221 @@
+<div class="page-head">
+  <h1><app-icon name="book" [size]="26" />Leituras</h1>
+  @if (stats(); as s) {
+    <p class="stats muted num">
+      <b>{{ s.finishedThisYear }}</b> {{ s.finishedThisYear === 1 ? 'livro lido' : 'livros lidos' }} em {{ s.year }}
+      @if (s.pagesThisYear) { · {{ s.pagesThisYear }} páginas }
+    </p>
+  }
+  @if (editing() !== 'new') {
+    <button type="button" class="primary" (click)="newBook('lendo')"><app-icon name="plus" [size]="16" />Novo livro</button>
+  }
+</div>
+
+@if (error()) {
+  <p class="error">{{ error() }}</p>
+}
+
+<ng-template #bookForm>
+  @let b = editingBook();
+  <form class="book-form" #f (submit)="save($event, f)">
+    <h2>{{ editing() === 'new' ? 'Novo livro' : 'Editar livro' }}</h2>
+    <label class="wide">Título
+      <input name="title" required maxlength="200" [value]="b?.title ?? ''" placeholder="Ex.: Dom Casmurro" />
+    </label>
+    <label class="wide"><span>Autor <span class="opt">opcional</span></span>
+      <input name="author" maxlength="120" [value]="b?.author ?? ''" />
+    </label>
+    <label>Situação
+      <select name="status">
+        @for (s of statuses; track s.value) {
+          <option [value]="s.value" [selected]="(b?.status ?? newStatus()) === s.value">{{ s.label }}</option>
+        }
+      </select>
+    </label>
+    <label>Formato
+      <select name="format">
+        @for (fm of formats; track fm.value) {
+          <option [value]="fm.value" [selected]="(b?.format ?? 'fisico') === fm.value">{{ fm.label }}</option>
+        }
+      </select>
+    </label>
+    <label><span>Páginas <span class="opt">opcional</span></span>
+      <input name="totalPages" type="number" min="1" max="20000" inputmode="numeric" [value]="b?.totalPages ?? ''" />
+    </label>
+    <label>Página atual
+      <input name="currentPage" type="number" min="0" inputmode="numeric" [value]="b?.currentPage ?? ''" />
+    </label>
+    <label>Comecei em
+      <input name="startedOn" type="date" [value]="b?.startedOn ?? ''" />
+    </label>
+    <label>Terminei em
+      <input name="finishedOn" type="date" [value]="b?.finishedOn ?? ''" />
+    </label>
+    <label>Nota
+      <select name="rating">
+        <option value="" [selected]="!b?.rating">—</option>
+        @for (n of stars; track n) {
+          <option [value]="n" [selected]="b?.rating === n">{{ '★'.repeat(n) }}</option>
+        }
+      </select>
+    </label>
+    <p class="hint muted">As datas se preenchem sozinhas ao começar ou terminar um livro.</p>
+    <label class="wide">Notas
+      <textarea name="notes" rows="3" maxlength="4000" placeholder="Citações, quem recomendou, onde parou…">{{ b?.notes ?? '' }}</textarea>
+    </label>
+    <div class="form-actions wide">
+      <button type="submit" class="primary">Salvar</button>
+      <button type="button" class="ghost" (click)="editing.set(null)">Cancelar</button>
+      @if (b) {
+        <button type="button" class="ghost danger push" (click)="remove(b)"><app-icon name="trash" [size]="14" />Excluir</button>
+      }
+    </div>
+  </form>
+</ng-template>
+
+@if (editing() === 'new') {
+  <ng-container *ngTemplateOutlet="bookForm" />
+}
+
+@if (loading()) {
+  <p class="muted">Carregando…</p>
+}
+
+<!-- ---------- Lendo agora ---------- -->
+<section class="block">
+  <h3>Lendo agora</h3>
+  @if (reading().length) {
+    <div class="reading">
+      @for (b of reading(); track b.id) {
+        @if (editing() === b.id) {
+          <ng-container *ngTemplateOutlet="bookForm" />
+        } @else {
+          <article class="book card">
+            <div class="cover" aria-hidden="true">{{ b.title.charAt(0) }}</div>
+            <div class="info">
+              <header>
+                <div>
+                  <h2>{{ b.title }}</h2>
+                  <p class="muted">{{ b.author ?? 'Autor desconhecido' }} · {{ b.formatLabel }}</p>
+                </div>
+                <button type="button" class="icon" (click)="editing.set(b.id)" [attr.aria-label]="'Editar ' + b.title"><app-icon name="pencil" [size]="15" /></button>
+              </header>
+
+              @if (b.progress; as p) {
+                <div class="progress" role="progressbar" [attr.aria-valuenow]="p.pct" aria-valuemin="0" aria-valuemax="100"><span [style.width.%]="p.pct"></span></div>
+                <p class="progress-text num">
+                  <b>{{ p.pct }}%</b> · página {{ b.currentPage }} de {{ b.totalPages }} · faltam {{ p.left }}
+                </p>
+              } @else {
+                <p class="progress-text muted num">Página {{ b.currentPage }}</p>
+              }
+              @if (b.since || b.pace) {
+                <p class="small muted">{{ b.since }}@if (b.pace) { · {{ b.pace }} }</p>
+              }
+              @if (b.notes) { <p class="small notes-line">{{ b.notes }}</p> }
+
+              <div class="controls">
+                <div class="pager">
+                  <button type="button" class="ghost small" (click)="bump(b, -1)" aria-label="Voltar uma página">−1</button>
+                  <input type="number" min="0" inputmode="numeric" class="num" [value]="b.currentPage"
+                         (change)="setPage(b, $event)" [attr.aria-label]="'Página atual de ' + b.title" />
+                  <button type="button" class="ghost small" (click)="bump(b, 1)" aria-label="Avançar uma página">+1</button>
+                  <button type="button" class="ghost small" (click)="bump(b, 10)" aria-label="Avançar dez páginas">+10</button>
+                </div>
+                <div class="actions">
+                  <button type="button" class="primary small" (click)="finish(b)"><app-icon name="check" [size]="14" />Terminei</button>
+                  <button type="button" class="ghost small" (click)="abandon(b)">Abandonar</button>
+                </div>
+              </div>
+            </div>
+          </article>
+        }
+      }
+    </div>
+  } @else if (!loading()) {
+    <div class="empty card">
+      <p class="muted">Nenhum livro em leitura.</p>
+      @if (queue().length) { <p class="muted small">Escolha um da lista abaixo e toque em Começar.</p> }
+    </div>
+  }
+</section>
+
+<!-- ---------- Quero ler ---------- -->
+<section class="block">
+  <div class="block-head">
+    <h3>Quero ler @if (queue().length) { <span class="num">({{ queue().length }})</span> }</h3>
+    <button type="button" class="ghost small" (click)="newBook('queroLer')"><app-icon name="plus" [size]="14" />Adicionar à lista</button>
+  </div>
+  @if (queue().length) {
+    <ul class="list card">
+      @for (b of queue(); track b.id) {
+        @if (editing() === b.id) {
+          <li class="editing"><ng-container *ngTemplateOutlet="bookForm" /></li>
+        } @else {
+          <li>
+            <span class="what">
+              <strong>{{ b.title }}</strong>
+              <small class="muted">{{ b.author ?? 'Autor desconhecido' }} · {{ b.formatLabel }}@if (b.totalPages) { · {{ b.totalPages }} pág. }</small>
+              @if (b.notes) { <small class="notes-line">{{ b.notes }}</small> }
+            </span>
+            <span class="row-tools">
+              <button type="button" class="ghost small" (click)="start(b)"><app-icon name="book" [size]="14" />Começar</button>
+              <button type="button" class="icon" (click)="editing.set(b.id)" [attr.aria-label]="'Editar ' + b.title"><app-icon name="pencil" [size]="15" /></button>
+            </span>
+          </li>
+        }
+      }
+    </ul>
+  } @else {
+    <p class="muted small">Anote aqui os livros que alguém recomendou ou que você quer comprar.</p>
+  }
+</section>
+
+<!-- ---------- Lidos ---------- -->
+@if (finishedByYear().length) {
+  <section class="block">
+    <div class="block-head">
+      <button type="button" class="ghost small" (click)="showFinished.set(!showFinished())" [attr.aria-expanded]="showFinished()">
+        <app-icon [name]="showFinished() ? 'chevronLeft' : 'chevronRight'" [size]="14" />Lidos
+      </button>
+    </div>
+    @if (showFinished()) {
+      @for (g of finishedByYear(); track g.year) {
+        <h4>{{ g.year }} <span class="muted num">· {{ g.books.length }}</span></h4>
+        <ul class="list card">
+          @for (b of g.books; track b.id) {
+            @if (editing() === b.id) {
+              <li class="editing"><ng-container *ngTemplateOutlet="bookForm" /></li>
+            } @else {
+              <li [class.dropped]="b.status === 'abandonado'">
+                <span class="what">
+                  <strong>{{ b.title }}</strong>
+                  <small class="muted">
+                    {{ b.author ?? 'Autor desconhecido' }}@if (b.finished) { · {{ b.status === 'abandonado' ? 'parou em' : 'terminado em' }} {{ b.finished }} }
+                    @if (b.status === 'abandonado') { · <span class="tag">Abandonado@if (b.progress) { em {{ b.progress.pct }}% }</span> }
+                  </small>
+                  @if (b.notes) { <small class="notes-line">{{ b.notes }}</small> }
+                </span>
+                <span class="row-tools">
+                  @if (b.status === 'lido') {
+                    <span class="stars" role="radiogroup" [attr.aria-label]="'Nota de ' + b.title">
+                      @for (n of stars; track n) {
+                        <button type="button" class="star" [class.on]="(b.rating ?? 0) >= n" (click)="rate(b, n)"
+                                role="radio" [attr.aria-checked]="b.rating === n" [attr.aria-label]="n + (n === 1 ? ' estrela' : ' estrelas')">
+                          <app-icon name="star" [size]="16" />
+                        </button>
+                      }
+                    </span>
+                  } @else {
+                    <button type="button" class="ghost small" (click)="start(b)">Retomar</button>
+                  }
+                  <button type="button" class="icon" (click)="editing.set(b.id)" [attr.aria-label]="'Editar ' + b.title"><app-icon name="pencil" [size]="15" /></button>
+                </span>
+              </li>
+            }
+          }
+        </ul>
+      }
+    }
+  </section>
+}

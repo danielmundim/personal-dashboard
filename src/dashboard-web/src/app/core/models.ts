@@ -332,3 +332,48 @@ export interface SaveTrip {
   endDate: string | null;
   notes: string | null;
 }
+
+/** Where a book is on our shelf. */
+export type BookStatus = 'queroLer' | 'lendo' | 'lido' | 'abandonado';
+
+export type BookFormat = 'fisico' | 'ebook' | 'audiobook';
+
+export interface Book {
+  id: string;
+  title: string;
+  author: string | null;
+  status: BookStatus;
+  format: BookFormat;
+  totalPages: number | null;
+  /** The bookmark; 0 before starting. */
+  currentPage: number;
+  /** Local calendar days, "yyyy-mm-dd". */
+  startedOn: string | null;
+  finishedOn: string | null;
+  /** 1–5 stars, once read. */
+  rating: number | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface BookList {
+  reading: Book[];
+  queue: Book[];
+  /** Read and dropped books, most recently finished first. */
+  finished: Book[];
+  stats: { year: number; finishedThisYear: number; pagesThisYear: number };
+  updatedAt: string;
+}
+
+export interface SaveBook {
+  title: string;
+  author: string | null;
+  status: BookStatus;
+  format: BookFormat;
+  totalPages: number | null;
+  currentPage: number | null;
+  startedOn: string | null;
+  finishedOn: string | null;
+  rating: number | null;
+  notes: string | null;
+}

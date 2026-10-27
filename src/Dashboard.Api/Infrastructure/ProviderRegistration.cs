@@ -32,6 +32,7 @@ public static class ProviderRegistration
         services.AddSingleton<ShoppingStore>();
         services.AddSingleton<Dashboard.Api.Features.Stock.StockStore>();
         services.AddSingleton<Dashboard.Api.Features.Trips.TripStore>();
+        services.AddSingleton<Dashboard.Api.Features.Books.BookStore>();
         services.AddSingleton<PhotoStore>();
 
         // Widgets backed by external services talk through one interface each. Dashboard:Integrations

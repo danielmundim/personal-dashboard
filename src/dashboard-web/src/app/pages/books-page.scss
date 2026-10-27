@@ -1,0 +1,202 @@
+:host { display: flex; flex-direction: column; gap: 20px; --accent: var(--violet); }
+
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+
+  h1 { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 1.6rem; font-weight: 600; }
+  .stats { flex: 1; font-size: 0.9rem; b { color: var(--accent); font-size: 1.1rem; } }
+}
+
+h2 { margin: 0; font-size: 1.15rem; font-weight: 600; }
+h3 { margin: 0; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+h4 { margin: 8px 0 6px; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); }
+p { margin: 0; }
+.small { font-size: 0.82rem; }
+.error { color: var(--rose); font-size: 0.85rem; }
+.notes-line { color: var(--text-faint); font-style: italic; }
+
+button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  &.primary { border: 0; color: #fff; background: var(--accent); }
+  &.ghost { border: 1px solid var(--border); color: var(--text-muted); background: transparent; }
+  &.ghost:hover { color: var(--text); border-color: var(--border-strong); }
+  &.small { height: 32px; padding: 0 10px; font-size: 0.8rem; }
+  &.danger:hover { color: var(--rose); }
+
+  &.icon {
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    color: var(--text-faint);
+    background: transparent;
+    &:hover { color: var(--text); background: var(--surface-2); }
+  }
+}
+
+input, textarea, select {
+  min-width: 0;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface-2);
+
+  &:focus { outline: 2px solid color-mix(in srgb, var(--accent) 50%, transparent); outline-offset: 1px; }
+  &::placeholder { color: var(--text-faint); }
+}
+
+textarea { resize: vertical; line-height: 1.45; }
+
+.card, .book-form {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.block { display: flex; flex-direction: column; gap: 10px; }
+.block-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+/* ---------- Lendo agora ---------- */
+
+.reading {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr));
+  gap: 16px;
+}
+
+.book {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 16px;
+  padding: 18px;
+
+  .cover {
+    display: grid;
+    place-items: center;
+    width: 72px;
+    height: 104px;
+    border-radius: 6px 10px 10px 6px;
+    font-size: 2rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #000));
+    box-shadow: inset 4px 0 0 rgb(0 0 0 / 18%);
+  }
+
+  .info { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  header { display: flex; justify-content: space-between; gap: 8px; p { margin-top: 2px; font-size: 0.85rem; } }
+
+  @media (max-width: 480px) {
+    grid-template-columns: 1fr;
+    .cover { display: none; }
+  }
+}
+
+.progress {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  overflow: hidden;
+
+  span { display: block; height: 100%; border-radius: 4px; background: var(--accent); transition: width 0.3s; }
+}
+
+.progress-text { font-size: 0.85rem; b { color: var(--accent); } }
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+
+  .pager, .actions { display: flex; align-items: center; gap: 6px; }
+  .pager input { width: 72px; height: 32px; padding: 0 8px; text-align: center; }
+}
+
+.empty { padding: 20px; display: flex; flex-direction: column; gap: 6px; }
+
+/* ---------- Lists ---------- */
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 16px;
+
+  li {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 12px;
+    min-height: 56px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+
+    &:last-child { border-bottom: 0; }
+    &.editing { display: block; }
+    &.dropped strong { color: var(--text-muted); }
+  }
+
+  .what { display: flex; flex-direction: column; min-width: 0; small { font-size: 0.8rem; } }
+  .row-tools { display: flex; align-items: center; gap: 6px; }
+  .tag { color: var(--amber); font-weight: 600; }
+  .book-form { box-shadow: none; margin: 8px 0; }
+}
+
+.stars { display: inline-flex; }
+
+.star {
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  color: var(--border-strong);
+  background: transparent;
+
+  &.on { color: var(--amber); ::ng-deep svg { fill: currentColor; } }
+  &:hover { color: var(--amber); }
+}
+
+/* ---------- Form ---------- */
+
+/* Editing a "Lendo agora" card: the form takes the whole row instead of squeezing into one card's column. */
+.reading > .book-form { grid-column: 1 / -1; }
+
+.book-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  padding: 20px;
+
+  h2 { grid-column: 1 / -1; }
+  label { display: flex; flex-direction: column; gap: 5px; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); }
+  .opt { font-weight: 400; color: var(--text-faint); }
+  .wide { grid-column: span 2; }
+  .hint { align-self: center; font-size: 0.78rem; }
+  .form-actions { grid-column: 1 / -1; display: flex; gap: 8px; }
+  .push { margin-left: auto; }
+  label:has(textarea) { grid-column: 1 / -1; }
+
+  @media (max-width: 760px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    .wide, .hint { grid-column: 1 / -1; }
+  }
+}
