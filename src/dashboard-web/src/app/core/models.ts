@@ -354,6 +354,11 @@ export interface Book {
   rating: number | null;
   notes: string | null;
   createdAt: string;
+  /** A person id from the config. Null only on books saved before readers existed (shown to everyone). */
+  readerId: string | null;
+  isbn: string | null;
+  /** The cover was downloaded and is served from /api/books/{id}/cover. */
+  hasCover: boolean;
 }
 
 export interface BookList {
@@ -361,7 +366,6 @@ export interface BookList {
   queue: Book[];
   /** Read and dropped books, most recently finished first. */
   finished: Book[];
-  stats: { year: number; finishedThisYear: number; pagesThisYear: number };
   updatedAt: string;
 }
 
@@ -376,4 +380,120 @@ export interface SaveBook {
   finishedOn: string | null;
   rating: number | null;
   notes: string | null;
+  readerId: string | null;
+  isbn: string | null;
+}
+
+/** Open Library's details for an ISBN, used to prefill the form. */
+export interface BookLookup {
+  isbn: string;
+  title: string | null;
+  author: string | null;
+  totalPages: number | null;
+  coverUrl: string | null;
+}
+
+// ---------- Saúde ----------
+
+export type ExamKind = 'sangue' | 'urina' | 'imagem' | 'cardio' | 'consulta' | 'medidas' | 'outro';
+export type ExamOutcome = 'normal' | 'alterado';
+
+export interface HealthProfile {
+  personId: string;
+  heightCm: number | null;
+  /** Where the weight-loss effort began; progress toward the goal is measured from here. */
+  startWeightKg: number | null;
+  goalWeightKg: number | null;
+}
+
+export interface WeightEntry {
+  id: string;
+  personId: string;
+  date: string;
+  kg: number;
+  note: string | null;
+  source: 'manual' | 'foto';
+}
+
+export interface ExamResult {
+  /** Code from the marker catalog, e.g. "ldl". */
+  marker: string;
+  value: number;
+  /** The lab's own range, when the report shows one; otherwise the catalog default applies. */
+  refLow: number | null;
+  refHigh: number | null;
+}
+
+export interface Exam {
+  id: string;
+  personId: string;
+  date: string;
+  kind: ExamKind;
+  title: string;
+  provider: string | null;
+  outcome: ExamOutcome | null;
+  notes: string | null;
+  results: ExamResult[];
+  createdAt: string;
+}
+
+export interface Checkup {
+  id: string;
+  personId: string;
+  name: string;
+  kind: ExamKind;
+  everyMonths: number;
+  lastDone: string | null;
+}
+
+export interface Marker {
+  code: string;
+  name: string;
+  area: string;
+  unit: string;
+  refLow: number | null;
+  refHigh: number | null;
+}
+
+export interface HealthData {
+  profiles: HealthProfile[];
+  /** Oldest first. */
+  weights: WeightEntry[];
+  /** Newest first. */
+  exams: Exam[];
+  checkups: Checkup[];
+  markers: Marker[];
+  updatedAt: string;
+}
+
+export interface SaveWeight {
+  personId: string;
+  date: string;
+  kg: number;
+  note: string | null;
+}
+
+export interface SaveProfile {
+  heightCm: number | null;
+  startWeightKg: number | null;
+  goalWeightKg: number | null;
+}
+
+export interface SaveExam {
+  personId: string;
+  date: string;
+  kind: ExamKind;
+  title: string;
+  provider: string | null;
+  outcome: ExamOutcome | null;
+  notes: string | null;
+  results: ExamResult[];
+}
+
+export interface SaveCheckup {
+  personId: string;
+  name: string;
+  kind: ExamKind;
+  everyMonths: number;
+  lastDone: string | null;
 }

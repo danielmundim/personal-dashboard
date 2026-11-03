@@ -2,7 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { MINUTE } from './dashboard-data';
-import { Book, BookFormat, BookList, BookStatus, SaveBook } from './models';
+import { Book, BookFormat, BookList, BookLookup, BookStatus, SaveBook } from './models';
 import { pollingResource } from './polling-resource';
 import { valueOf } from '../shared/resource-state';
 import { saveErrorMessage } from './save-error';
@@ -19,7 +19,6 @@ export class Books {
   readonly reading = computed(() => valueOf(this.res)?.reading ?? []);
   readonly queue = computed(() => valueOf(this.res)?.queue ?? []);
   readonly finished = computed(() => valueOf(this.res)?.finished ?? []);
-  readonly stats = computed(() => valueOf(this.res)?.stats ?? null);
   readonly error = signal<string | null>(null);
 
   create(book: SaveBook) {
@@ -36,8 +35,25 @@ export class Books {
     return this.apply(this.http.patch<BookList>(`/api/books/${id}/progress`, { currentPage }));
   }
 
-  setStatus(id: string, status: BookStatus, rating: number | null = null) {
-    return this.apply(this.http.patch<BookList>(`/api/books/${id}/status`, { status, rating }));
+  /** `readerId` claims a book that has no reader yet (saved before readers existed); never reassigns one. */
+  setStatus(id: string, status: BookStatus, rating: number | null = null, readerId: string | null = null) {
+    return this.apply(this.http.patch<BookList>(`/api/books/${id}/status`, { status, rating, readerId }));
+  }
+
+  /** Open Library details for the form; null when the ISBN is unknown there or the lookup failed. */
+  lookup(isbn: string): Promise<{ book: BookLookup | null; error: string | null }> {
+    return new Promise((resolve) =>
+      this.http.get<BookLookup>(`/api/books/lookup/${encodeURIComponent(isbn)}`).subscribe({
+        next: (book) => resolve({ book, error: null }),
+        error: (e) =>
+          resolve({
+            book: null,
+            error: e.status === 404 ? 'O Open Library não conhece esse ISBN. Preencha à mão.'
+              : e.status === 502 ? 'Não foi possível falar com o Open Library agora.'
+              : saveErrorMessage(e),
+          }),
+      }),
+    );
   }
 
   remove(id: string) {
@@ -74,6 +90,11 @@ export const FORMATS: { value: BookFormat; label: string }[] = [
   { value: 'ebook', label: 'E-book' },
   { value: 'audiobook', label: 'Audiolivro' },
 ];
+
+/** Served by the API from the downloaded copy; the ISBN busts the browser cache when the edition changes. */
+export function coverUrl(b: Book) {
+  return b.hasCover ? `/api/books/${b.id}/cover?v=${b.isbn}` : null;
+}
 
 /** Reading progress, e.g. { pct: 54, left: 122 }; null without a page count. */
 export function bookProgress(b: Book) {

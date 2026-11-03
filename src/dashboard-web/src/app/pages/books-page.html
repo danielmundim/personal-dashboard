@@ -1,15 +1,26 @@
 <div class="page-head">
   <h1><app-icon name="book" [size]="26" />Leituras</h1>
-  @if (stats(); as s) {
-    <p class="stats muted num">
-      <b>{{ s.finishedThisYear }}</b> {{ s.finishedThisYear === 1 ? 'livro lido' : 'livros lidos' }} em {{ s.year }}
-      @if (s.pagesThisYear) { · {{ s.pagesThisYear }} páginas }
-    </p>
-  }
+  @let s = stats();
+  <p class="stats muted num">
+    <b>{{ s.count }}</b> {{ s.count === 1 ? 'livro lido' : 'livros lidos' }} em {{ s.year }}@if (reader(); as r) { por {{ r.name }} }
+    @if (s.pages) { · {{ s.pages }} páginas }
+  </p>
   @if (editing() !== 'new') {
     <button type="button" class="primary" (click)="newBook('lendo')"><app-icon name="plus" [size]="16" />Novo livro</button>
   }
 </div>
+
+@if (people().length) {
+  <div class="readers" role="tablist" aria-label="Quem está lendo">
+    <button type="button" role="tab" [class.on]="!reader()" [attr.aria-selected]="!reader()" (click)="showReader(null)">Todos</button>
+    @for (p of people(); track p.id) {
+      <button type="button" role="tab" [attr.data-tone]="p.color" [class.on]="reader()?.id === p.id"
+              [attr.aria-selected]="reader()?.id === p.id" (click)="showReader(p.id)">
+        <span class="dot" aria-hidden="true"></span>{{ p.name }}
+      </button>
+    }
+  </div>
+}
 
 @if (error()) {
   <p class="error">{{ error() }}</p>
@@ -19,6 +30,30 @@
   @let b = editingBook();
   <form class="book-form" #f (submit)="save($event, f)">
     <h2>{{ editing() === 'new' ? 'Novo livro' : 'Editar livro' }}</h2>
+    <label class="wide"><span>ISBN <span class="opt">preenche título, autor, páginas e capa</span></span>
+      <span class="isbn">
+        <input name="isbn" maxlength="20" inputmode="numeric" autocomplete="off" [value]="b?.isbn ?? ''" placeholder="978…"
+               (keydown.enter)="$event.preventDefault(); findIsbn(f)" />
+        <button type="button" class="ghost" (click)="findIsbn(f)" [disabled]="lookup().busy">{{ lookup().busy ? 'Buscando…' : 'Buscar' }}</button>
+      </span>
+    </label>
+    <label class="wide">Quem está lendo
+      <select name="readerId" required>
+        @for (p of people(); track p.id) {
+          <option [value]="p.id" [selected]="(b?.readerId ?? defaultReader()) === p.id">{{ p.name }}</option>
+        }
+      </select>
+    </label>
+    @if (lookup().found || lookup().error) {
+      <div class="lookup wide-all">
+        @if (lookup().found?.coverUrl; as url) { <img [src]="url" alt="" /> }
+        @if (lookup().found; as found) {
+          <p class="small">Encontrado no Open Library: <strong>{{ found.title ?? 'sem título' }}</strong>@if (found.author) { · {{ found.author }} }. Confira os campos abaixo e salve.</p>
+        } @else {
+          <p class="small warn">{{ lookup().error }}</p>
+        }
+      </div>
+    }
     <label class="wide">Título
       <input name="title" required maxlength="200" [value]="b?.title ?? ''" placeholder="Ex.: Dom Casmurro" />
     </label>
@@ -65,7 +100,7 @@
     </label>
     <div class="form-actions wide">
       <button type="submit" class="primary">Salvar</button>
-      <button type="button" class="ghost" (click)="editing.set(null)">Cancelar</button>
+      <button type="button" class="ghost" (click)="open(null)">Cancelar</button>
       @if (b) {
         <button type="button" class="ghost danger push" (click)="remove(b)"><app-icon name="trash" [size]="14" />Excluir</button>
       }
@@ -91,14 +126,19 @@
           <ng-container *ngTemplateOutlet="bookForm" />
         } @else {
           <article class="book card">
-            <div class="cover" aria-hidden="true">{{ b.title.charAt(0) }}</div>
+            @if (b.cover) {
+              <img class="cover" [src]="b.cover" alt="" loading="lazy" />
+            } @else {
+              <div class="cover" aria-hidden="true">{{ b.title.charAt(0) }}</div>
+            }
             <div class="info">
               <header>
                 <div>
                   <h2>{{ b.title }}</h2>
                   <p class="muted">{{ b.author ?? 'Autor desconhecido' }} · {{ b.formatLabel }}</p>
+                  @if (b.readerChip; as r) { <span class="chip" [attr.data-tone]="r.color">{{ r.name }}</span> }
                 </div>
-                <button type="button" class="icon" (click)="editing.set(b.id)" [attr.aria-label]="'Editar ' + b.title"><app-icon name="pencil" [size]="15" /></button>
+                <button type="button" class="icon" (click)="open(b.id)" [attr.aria-label]="'Editar ' + b.title"><app-icon name="pencil" [size]="15" /></button>
               </header>
 
               @if (b.progress; as p) {
@@ -153,14 +193,15 @@
           <li class="editing"><ng-container *ngTemplateOutlet="bookForm" /></li>
         } @else {
           <li>
+            <span class="thumb" aria-hidden="true">@if (b.cover) { <img [src]="b.cover" alt="" loading="lazy" /> } @else { {{ b.title.charAt(0) }} }</span>
             <span class="what">
               <strong>{{ b.title }}</strong>
-              <small class="muted">{{ b.author ?? 'Autor desconhecido' }} · {{ b.formatLabel }}@if (b.totalPages) { · {{ b.totalPages }} pág. }</small>
+              <small class="muted">{{ b.author ?? 'Autor desconhecido' }} · {{ b.formatLabel }}@if (b.totalPages) { · {{ b.totalPages }} pág. }@if (b.readerChip; as r) { · <span class="who" [attr.data-tone]="r.color">{{ r.name }}</span> }</small>
               @if (b.notes) { <small class="notes-line">{{ b.notes }}</small> }
             </span>
             <span class="row-tools">
               <button type="button" class="ghost small" (click)="start(b)"><app-icon name="book" [size]="14" />Começar</button>
-              <button type="button" class="icon" (click)="editing.set(b.id)" [attr.aria-label]="'Editar ' + b.title"><app-icon name="pencil" [size]="15" /></button>
+              <button type="button" class="icon" (click)="open(b.id)" [attr.aria-label]="'Editar ' + b.title"><app-icon name="pencil" [size]="15" /></button>
             </span>
           </li>
         }
@@ -188,10 +229,11 @@
               <li class="editing"><ng-container *ngTemplateOutlet="bookForm" /></li>
             } @else {
               <li [class.dropped]="b.status === 'abandonado'">
+                <span class="thumb" aria-hidden="true">@if (b.cover) { <img [src]="b.cover" alt="" loading="lazy" /> } @else { {{ b.title.charAt(0) }} }</span>
                 <span class="what">
                   <strong>{{ b.title }}</strong>
                   <small class="muted">
-                    {{ b.author ?? 'Autor desconhecido' }}@if (b.finished) { · {{ b.status === 'abandonado' ? 'parou em' : 'terminado em' }} {{ b.finished }} }
+                    {{ b.author ?? 'Autor desconhecido' }}@if (b.readerChip; as r) { · <span class="who" [attr.data-tone]="r.color">{{ r.name }}</span> }@if (b.finished) { · {{ b.status === 'abandonado' ? 'parou em' : 'terminado em' }} {{ b.finished }} }
                     @if (b.status === 'abandonado') { · <span class="tag">Abandonado@if (b.progress) { em {{ b.progress.pct }}% }</span> }
                   </small>
                   @if (b.notes) { <small class="notes-line">{{ b.notes }}</small> }
@@ -209,7 +251,7 @@
                   } @else {
                     <button type="button" class="ghost small" (click)="start(b)">Retomar</button>
                   }
-                  <button type="button" class="icon" (click)="editing.set(b.id)" [attr.aria-label]="'Editar ' + b.title"><app-icon name="pencil" [size]="15" /></button>
+                  <button type="button" class="icon" (click)="open(b.id)" [attr.aria-label]="'Editar ' + b.title"><app-icon name="pencil" [size]="15" /></button>
                 </span>
               </li>
             }

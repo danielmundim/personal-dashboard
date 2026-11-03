@@ -1,0 +1,405 @@
+<div class="page-head">
+  <h1><app-icon name="heart" [size]="26" />Saúde</h1>
+  <label class="as-of" [class.past]="asOfPick()">
+    <app-icon name="calendar" [size]="16" />
+    <span>{{ asOfPick() ? 'Como estava em' : 'Hoje' }}</span>
+    <input type="date" [value]="asOf()" [max]="today()" (change)="pickAsOf($any($event.target).value)" aria-label="Ver como estava em" />
+    @if (asOfPick()) {
+      <button type="button" class="icon" (click)="asOfPick.set(null)" aria-label="Voltar para hoje"><app-icon name="x" [size]="16" /></button>
+    }
+  </label>
+  @if (showExams && editing() === null) {
+    <button type="button" class="primary" (click)="startExam(null)"><app-icon name="plus" [size]="16" />Novo exame</button>
+  }
+</div>
+
+@if (people().length > 1) {
+  <div class="readers" role="tablist" aria-label="De quem">
+    <button type="button" role="tab" [class.on]="!person()" [attr.aria-selected]="!person()" (click)="showPerson(null)">Ambos</button>
+    @for (p of people(); track p.id) {
+      <button type="button" role="tab" [attr.data-tone]="p.color" [class.on]="person()?.id === p.id"
+              [attr.aria-selected]="person()?.id === p.id" (click)="showPerson(p.id)">
+        <span class="dot" aria-hidden="true"></span>{{ p.name }}
+      </button>
+    }
+  </div>
+}
+
+@if (error()) {
+  <p class="error">{{ error() }}</p>
+}
+
+<!-- ---------- Exam form ---------- -->
+@if (showExams && editing() !== null) {
+  @let e = editingExam();
+  <form class="card exam-form" #ef (submit)="saveExam($event, ef)">
+    <h2>{{ e ? 'Editar exame' : 'Novo exame' }}</h2>
+    <label>De quem
+      <select name="personId" required>
+        @for (p of people(); track p.id) {
+          <option [value]="p.id" [selected]="(e?.personId ?? defaultPerson()) === p.id">{{ p.name }}</option>
+        }
+      </select>
+    </label>
+    <label>Data
+      <input name="date" type="date" required [value]="e?.date ?? today()" [max]="today()" />
+    </label>
+    <label>Tipo
+      <select name="kind" (change)="draftKind.set($any($event.target).value)">
+        @for (k of examKinds; track k.value) {
+          <option [value]="k.value" [selected]="draftKind() === k.value">{{ k.label }}</option>
+        }
+      </select>
+    </label>
+    <label>Nome
+      <input name="title" required maxlength="100" list="exam-titles" [value]="e?.title ?? (draftKind() === 'sangue' ? 'Check-up de sangue' : '')" placeholder="Ex.: Dentista, Eletrocardiograma" />
+      <datalist id="exam-titles">
+        @for (t of titleSuggestions(); track t) { <option [value]="t"></option> }
+      </datalist>
+    </label>
+    <label>Local / médico
+      <input name="provider" maxlength="100" [value]="e?.provider ?? ''" placeholder="Ex.: Laboratório Sabin" />
+    </label>
+    <label>Resultado geral
+      <select name="outcome">
+        <option value="" [selected]="!e?.outcome">—</option>
+        <option value="normal" [selected]="e?.outcome === 'normal'">Normal</option>
+        <option value="alterado" [selected]="e?.outcome === 'alterado'">Alterado</option>
+      </select>
+    </label>
+    <label class="wide">Notas
+      <textarea name="notes" rows="2" maxlength="2000" placeholder="O que o médico disse, próximos passos…">{{ e?.notes ?? '' }}</textarea>
+    </label>
+
+    <div class="wide results-editor">
+      <h3>Valores medidos</h3>
+      @if (drafts().length) {
+        <div class="draft-row head" aria-hidden="true">
+          <span>Marcador</span><span>Valor</span><span>Ref. mín.</span><span>Ref. máx.</span><span></span>
+        </div>
+      }
+      @for (d of drafts(); track d.key) {
+        @let m = draftMarker(d.marker);
+        <div class="draft-row">
+          <select [value]="d.marker" (change)="setDraft(d.key, 'marker', $any($event.target).value)" aria-label="Marcador">
+            <option value="">Escolha…</option>
+            @for (g of markersByArea(); track g.area) {
+              <optgroup [label]="g.area">
+                @for (mk of g.markers; track mk.code) {
+                  <option [value]="mk.code" [selected]="d.marker === mk.code">{{ mk.name }}</option>
+                }
+              </optgroup>
+            }
+          </select>
+          <span class="with-unit">
+            <input inputmode="decimal" [value]="d.value" (input)="setDraft(d.key, 'value', $any($event.target).value)" aria-label="Valor" placeholder="0" />
+            <small>{{ m?.unit }}</small>
+          </span>
+          <input inputmode="decimal" [value]="d.refLow" (input)="setDraft(d.key, 'refLow', $any($event.target).value)"
+                 [placeholder]="m?.refLow !== null && m?.refLow !== undefined ? num(m!.refLow!) : '—'" aria-label="Referência mínima do laboratório" />
+          <input inputmode="decimal" [value]="d.refHigh" (input)="setDraft(d.key, 'refHigh', $any($event.target).value)"
+                 [placeholder]="m?.refHigh !== null && m?.refHigh !== undefined ? num(m!.refHigh!) : '—'" aria-label="Referência máxima do laboratório" />
+          <button type="button" class="icon" (click)="removeDraft(d.key)" aria-label="Remover linha"><app-icon name="x" [size]="16" /></button>
+        </div>
+      }
+      <div class="draft-actions">
+        <button type="button" class="ghost small" (click)="addDraft()"><app-icon name="plus" [size]="14" />Adicionar valor</button>
+        @if (hasBasicPanel()) {
+          <button type="button" class="ghost small" (click)="addBasicPanel()"><app-icon name="flask" [size]="14" />Adicionar painel básico</button>
+        }
+      </div>
+      <p class="hint muted">A referência vem do catálogo; preencha só quando o laudo mostrar outra faixa.</p>
+    </div>
+
+    <div class="form-actions wide">
+      <button type="submit" class="primary">Salvar</button>
+      <button type="button" class="ghost" (click)="editing.set(null)">Cancelar</button>
+      @if (e) {
+        <button type="button" class="ghost danger push" (click)="removeExam({ id: e.id, title: e.title, when: fmt.dateOnlyShort(e.date) })"><app-icon name="trash" [size]="16" />Excluir</button>
+      }
+    </div>
+  </form>
+}
+
+@if (loading()) {
+  <p class="muted">Carregando…</p>
+} @else {
+
+  <!-- ---------- Weight ---------- -->
+  <section class="card weight">
+    <header class="section-head">
+      <h2><app-icon name="scale" [size]="20" />Peso</h2>
+      <div class="range" role="tablist" aria-label="Período do gráfico">
+        @for (r of ranges; track r.days) {
+          <button type="button" role="tab" [class.on]="range() === r.days" [attr.aria-selected]="range() === r.days" (click)="range.set(r.days)">{{ r.label }}</button>
+        }
+      </div>
+    </header>
+
+    <div class="weight-cards">
+      @for (c of weightCards(); track c.id) {
+        <div class="weight-card" [attr.data-tone]="c.color">
+          <p class="who-line"><span class="dot"></span>{{ c.name }}
+            <button type="button" class="icon" (click)="editingGoals.set(editingGoals() === c.id ? null : c.id)" aria-label="Editar metas" title="Metas e altura"><app-icon name="target" [size]="16" /></button>
+          </p>
+          @if (c.latest) {
+            <p class="big num">{{ kg(c.latest.kg) }} <small>kg</small></p>
+            <p class="muted small">{{ c.latestWhen }}@if (c.bmi) { · IMC {{ c.bmi }} }</p>
+            @if (c.sinceStart) {
+              <p class="small"><b [class.good]="c.lost">{{ c.sinceStart }} kg</b> desde o início@if (c.week) { · <span [class.good]="c.weekDown">{{ c.week }}</span> na semana }</p>
+            }
+            @if (c.goal !== null) {
+              <div class="goal-bar" [attr.aria-label]="c.pct + '% da meta'"><div [style.width.%]="c.pct"></div></div>
+              <p class="muted small">Meta {{ kg(c.goal) }} kg · @if (c.toGo) { faltam {{ kg(c.toGo) }} kg } @else { atingida! }</p>
+            }
+            @if (c.streak > 1) {
+              <p class="muted small">{{ c.streak }} dias seguidos registrados</p>
+            }
+          } @else {
+            <p class="muted small">Nenhum peso registrado ainda.</p>
+          }
+
+          @if (editingGoals() === c.id) {
+            <form class="goals-form" #gf (submit)="saveGoals($event, gf, c.id)">
+              <label>Altura (cm)<input name="heightCm" inputmode="decimal" [value]="c.profile?.heightCm ?? ''" /></label>
+              <label>Peso inicial<input name="startWeightKg" inputmode="decimal" [value]="c.profile?.startWeightKg ?? ''" /></label>
+              <label>Meta (kg)<input name="goalWeightKg" inputmode="decimal" [value]="c.profile?.goalWeightKg ?? ''" /></label>
+              <div class="form-actions">
+                <button type="submit" class="primary small">Salvar</button>
+                <button type="button" class="ghost small" (click)="editingGoals.set(null)">Cancelar</button>
+              </div>
+            </form>
+          }
+        </div>
+      }
+    </div>
+
+    @if (chart(); as ch) {
+      <svg class="chart" [attr.viewBox]="'0 0 ' + ch.w + ' ' + ch.h" role="img" aria-label="Peso ao longo do tempo, com a média de 7 dias e a meta">
+        @for (t of ch.ticks; track t.label) {
+          <line [attr.x1]="ch.left" [attr.x2]="ch.right" [attr.y1]="t.y" [attr.y2]="t.y" class="grid" />
+          <text [attr.x]="ch.left - 6" [attr.y]="t.y + 4" class="axis" text-anchor="end">{{ t.label }}</text>
+        }
+        @for (d of ch.dates; track $index) {
+          <text [attr.x]="d.x" [attr.y]="ch.h - 6" class="axis" [attr.text-anchor]="$first ? 'start' : $last ? 'end' : 'middle'">{{ d.label }}</text>
+        }
+        @for (s of ch.series; track s.person.id) {
+          @if (s.goalY !== null) {
+            <line [attr.x1]="ch.left" [attr.x2]="ch.right" [attr.y1]="s.goalY" [attr.y2]="s.goalY" class="goal" [style.stroke]="s.color" />
+          }
+          @for (p of s.dots; track $index) {
+            <circle [attr.cx]="p.cx" [attr.cy]="p.cy" [attr.r]="p.odd ? 4 : 2.2" class="reading" [class.odd]="p.odd" [style.fill]="s.color"
+                    (click)="focusEntry(p.id)"><title>{{ p.title }}</title></circle>
+          }
+          <polyline [attr.points]="s.trend" class="trend" [style.stroke]="s.color" />
+        }
+      </svg>
+      <p class="muted small legend">Pontos: pesagens do dia (toque para achar o registro) · linha: média de 7 dias · tracejado: meta</p>
+    }
+
+    <form class="weight-form" #wf (submit)="saveWeight($event, wf)">
+      @if (people().length > 1) {
+        <select name="personId" aria-label="De quem">
+          @for (p of people(); track p.id) {
+            <option [value]="p.id" [selected]="defaultPerson() === p.id">{{ p.name }}</option>
+          }
+        </select>
+      } @else {
+        <input type="hidden" name="personId" [value]="defaultPerson()" />
+      }
+      <input name="date" type="date" [value]="today()" [max]="today()" aria-label="Data" />
+      <span class="with-unit"><input name="kg" inputmode="decimal" required placeholder="88,4" aria-label="Peso em kg" /><small>kg</small></span>
+      <button type="submit" class="primary"><app-icon name="plus" [size]="16" />Registrar peso</button>
+      <button type="button" class="ghost" (click)="showEntries.set(!showEntries())">
+        {{ showEntries() ? 'Esconder registros' : 'Ver registros' }}
+        @if (oddCount()) { <span class="pill" data-status="atencao">{{ oddCount() }} para conferir</span> }
+      </button>
+    </form>
+
+    @if (showEntries()) {
+      <p class="muted small">{{ entries().length }} registros no período do gráfico · mude o período acima para ver mais antigos.</p>
+      <ul class="entries">
+        @for (w of entries(); track w.id) {
+          <li [id]="'weight-' + w.id" [class.focused]="focusedEntry() === w.id" [class.odd]="w.odd">
+            <span class="who" [attr.data-tone]="w.who.color">{{ w.who.name }}</span>
+            <span class="muted">{{ w.when }}</span>
+            <b class="num">{{ kg(w.kg) }} kg</b>
+            @if (w.odd) { <span class="pill" data-status="atencao" title="Muito diferente dos outros pesos da semana">conferir</span> }
+            @else if (w.source === 'foto') { <span class="chip" data-tone="teal">foto</span> } @else { <span></span> }
+            <button type="button" class="icon danger" (click)="removeWeight(w)" aria-label="Excluir registro"><app-icon name="trash" [size]="15" /></button>
+          </li>
+        } @empty {
+          <li class="muted">Nenhum registro.</li>
+        }
+      </ul>
+    }
+  </section>
+
+  <!-- Exams are hidden for now (showExams in health-page.ts); only weight tracking is shown. -->
+  @if (showExams) {
+  <!-- ---------- Status by area ---------- -->
+  <section class="block">
+    <h3>Status por área <span class="muted">· último resultado de cada marcador{{ asOfPick() ? ' até ' + fmt.dateOnlyShort(asOf()) : '' }}</span></h3>
+    @if (areas().length) {
+      <div class="areas">
+        @for (a of areas(); track a.area) {
+          <button type="button" class="card area" [class.open]="openArea() === a.area" (click)="openArea.set(openArea() === a.area ? null : a.area)" [attr.aria-expanded]="openArea() === a.area">
+            <span class="area-name">{{ a.area }}</span>
+            <span class="muted small">{{ a.markerNames }}</span>
+            <span class="pills">
+              @for (pp of a.perPerson; track pp.person.id) {
+                @if (pp.status) {
+                  <span class="pill" [attr.data-status]="pp.status">{{ pp.person.name.charAt(0) }}: {{ statusLabel[pp.status] }}</span>
+                } @else {
+                  <span class="pill">{{ pp.person.name.charAt(0) }}: sem dados</span>
+                }
+              }
+            </span>
+          </button>
+        }
+      </div>
+      @for (a of areas(); track a.area) {
+        @if (openArea() === a.area) {
+          <div class="card markers">
+            <h2>{{ a.area }}</h2>
+            <ng-container *ngTemplateOutlet="readingList; context: { $implicit: a.rows }" />
+          </div>
+        }
+      }
+    } @else {
+      <p class="muted">Nenhum exame com valores ainda. Use "Novo exame" para registrar o primeiro.</p>
+    }
+  </section>
+
+  <div class="columns">
+    <!-- ---------- Attention ---------- -->
+    <section class="card block">
+      <h2><app-icon name="alert" [size]="18" />Precisa de atenção</h2>
+      @if (attention().length) {
+        <ng-container *ngTemplateOutlet="readingList; context: { $implicit: attention() }" />
+      } @else {
+        <p class="muted">Todos os valores medidos estão dentro da referência.</p>
+      }
+    </section>
+
+    <!-- ---------- Checkups ---------- -->
+    <section class="card block">
+      <header class="section-head">
+        <h2><app-icon name="calendar" [size]="18" />Rotina de exames</h2>
+        <button type="button" class="ghost small" (click)="addingCheckup.set(!addingCheckup())"><app-icon name="plus" [size]="14" />Rotina</button>
+      </header>
+      @if (addingCheckup()) {
+        <form class="checkup-form" #cf (submit)="saveCheckup($event, cf)">
+          <input name="name" required maxlength="100" placeholder="Ex.: Dentista" aria-label="Nome" list="exam-titles-checkup" />
+          <datalist id="exam-titles-checkup">
+            @for (t of titleSuggestions(); track t) { <option [value]="t"></option> }
+          </datalist>
+          <select name="personId" aria-label="De quem">
+            @for (p of people(); track p.id) {
+              <option [value]="p.id" [selected]="defaultPerson() === p.id">{{ p.name }}</option>
+            }
+          </select>
+          <select name="kind" aria-label="Tipo">
+            @for (k of examKinds; track k.value) { <option [value]="k.value" [selected]="k.value === 'consulta'">{{ k.label }}</option> }
+          </select>
+          <select name="everyMonths" aria-label="Frequência">
+            <option value="3">a cada 3 meses</option>
+            <option value="6">a cada 6 meses</option>
+            <option value="12" selected>todo ano</option>
+            <option value="24">a cada 2 anos</option>
+          </select>
+          <label class="inline">Última vez <input name="lastDone" type="date" [max]="today()" /></label>
+          <div class="form-actions">
+            <button type="submit" class="primary small">Adicionar</button>
+            <button type="button" class="ghost small" (click)="addingCheckup.set(false)">Cancelar</button>
+          </div>
+        </form>
+      }
+      <ul class="checkups">
+        @for (c of checkups(); track c.id) {
+          <li>
+            <app-icon [name]="c.icon" [size]="18" class="kind-icon" />
+            <div>
+              <p><b>{{ c.name }}</b> · <span class="who" [attr.data-tone]="c.who.color">{{ c.who.name }}</span></p>
+              <p class="muted small">{{ c.every }}@if (c.last) { · {{ c.last }} }</p>
+            </div>
+            <span class="pill" [attr.data-status]="c.tone">{{ c.label }}</span>
+            <span class="row-actions">
+              <button type="button" class="ghost small" (click)="markDone(c.id)" title="Marcar como feito hoje"><app-icon name="check" [size]="14" />Feito</button>
+              <button type="button" class="icon danger" (click)="removeCheckup(c)" aria-label="Remover rotina"><app-icon name="trash" [size]="15" /></button>
+            </span>
+          </li>
+        } @empty {
+          <li class="muted">Adicione o que vocês repetem (dentista, check-up anual…) para ver o que está vencendo.</li>
+        }
+      </ul>
+    </section>
+  </div>
+
+  <!-- ---------- Exam history ---------- -->
+  <section class="card block">
+    <h2><app-icon name="flask" [size]="18" />Exames e consultas</h2>
+    <ul class="exams">
+      @for (e of exams(); track e.id) {
+        <li [class.open]="openExam() === e.id">
+          <button type="button" class="exam-row" (click)="openExam.set(openExam() === e.id ? null : e.id)" [attr.aria-expanded]="openExam() === e.id">
+            <app-icon [name]="e.icon" [size]="18" class="kind-icon" />
+            <span class="exam-title"><b>{{ e.title }}</b> · <span class="who" [attr.data-tone]="e.who.color">{{ e.who.name }}</span>
+              @if (e.provider) { <span class="muted"> · {{ e.provider }}</span> }
+            </span>
+            @if (e.summary) {
+              <span class="muted small" [class.flag]="e.flagged">{{ e.summary }}</span>
+            }
+            <span class="muted small date">{{ e.when }} {{ e.year }}</span>
+          </button>
+          @if (openExam() === e.id) {
+            <div class="exam-detail">
+              @if (e.notes) { <p class="notes">{{ e.notes }}</p> }
+              @if (e.resultViews.length) {
+                <table>
+                  <thead><tr><th>Marcador</th><th>Valor</th><th>Referência</th><th></th></tr></thead>
+                  <tbody>
+                    @for (r of e.resultViews; track r.name) {
+                      <tr>
+                        <td>{{ r.name }}</td>
+                        <td class="num">{{ r.value }}</td>
+                        <td class="muted">{{ r.range }}</td>
+                        <td><span class="pill" [attr.data-status]="r.status">{{ statusLabel[r.status] }}</span></td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              }
+              <div class="form-actions">
+                <button type="button" class="ghost small" (click)="startExam(e)"><app-icon name="pencil" [size]="14" />Editar</button>
+              </div>
+            </div>
+          }
+        </li>
+      } @empty {
+        <li class="muted">Nenhum exame registrado{{ asOfPick() ? ' até essa data' : '' }}.</li>
+      }
+    </ul>
+    @if (examCount() > 8) {
+      <button type="button" class="ghost small" (click)="showAllExams.set(!showAllExams())">{{ showAllExams() ? 'Mostrar menos' : 'Ver todos (' + examCount() + ')' }}</button>
+    }
+  </section>
+  }
+}
+
+<ng-template #readingList let-rows>
+  <ul class="readings">
+    @for (r of rows; track r.key) {
+      <li>
+        <span class="r-name">{{ r.name }}@if (shown().length > 1) { · <span class="who" [attr.data-tone]="r.who.color">{{ r.who.name }}</span> }</span>
+        <svg class="spark" viewBox="0 0 60 18" aria-hidden="true">
+          <rect x="0" [attr.y]="r.spark.band.y" width="60" [attr.height]="r.spark.band.height" class="band" />
+          <polyline [attr.points]="r.spark.points" class="line" [attr.data-status]="r.status" />
+          <circle [attr.cx]="r.spark.last.cx" [attr.cy]="r.spark.last.cy" r="2" class="last" [attr.data-status]="r.status" />
+        </svg>
+        <span class="pill num" [attr.data-status]="r.status">{{ r.value }}</span>
+        <span class="muted small r-meta">ref. {{ r.range }} · {{ r.when }}@if (r.previous) { · antes {{ r.previous }} }</span>
+      </li>
+    }
+  </ul>
+</ng-template>

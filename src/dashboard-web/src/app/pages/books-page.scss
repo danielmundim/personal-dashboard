@@ -70,6 +70,53 @@ textarea { resize: vertical; line-height: 1.45; }
   box-shadow: var(--shadow);
 }
 
+/* ---------- Reader switcher ---------- */
+
+.readers {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-self: flex-start;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+
+  button {
+    --tone: var(--accent);
+    height: 40px;
+    padding: 0 16px;
+    border: 0;
+    color: var(--text-muted);
+    background: transparent;
+
+    &.on { color: #fff; background: var(--tone); }
+  }
+
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--tone); }
+  .on .dot { background: #fff; }
+
+  [data-tone='sky'] { --tone: var(--sky); }
+  [data-tone='amber'] { --tone: var(--amber); }
+  [data-tone='green'] { --tone: var(--green); }
+  [data-tone='violet'] { --tone: var(--violet); }
+  [data-tone='rose'] { --tone: var(--rose); }
+  [data-tone='teal'] { --tone: var(--teal); }
+}
+
+/* Person name inside a list line, tinted with their colour. */
+.who {
+  font-weight: 600;
+  color: color-mix(in srgb, var(--tone, var(--accent)) 85%, var(--text));
+
+  &[data-tone='sky'] { --tone: var(--sky); }
+  &[data-tone='amber'] { --tone: var(--amber); }
+  &[data-tone='green'] { --tone: var(--green); }
+  &[data-tone='violet'] { --tone: var(--violet); }
+  &[data-tone='rose'] { --tone: var(--rose); }
+  &[data-tone='teal'] { --tone: var(--teal); }
+}
+
 .block { display: flex; flex-direction: column; gap: 10px; }
 .block-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 
@@ -99,9 +146,10 @@ textarea { resize: vertical; line-height: 1.45; }
     background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #000));
     box-shadow: inset 4px 0 0 rgb(0 0 0 / 18%);
   }
+  img.cover { object-fit: cover; background: var(--surface-2); box-shadow: 0 2px 8px rgb(0 0 0 / 25%); }
 
   .info { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-  header { display: flex; justify-content: space-between; gap: 8px; p { margin-top: 2px; font-size: 0.85rem; } }
+  header { display: flex; justify-content: space-between; gap: 8px; p { margin-top: 2px; font-size: 0.85rem; } .chip { margin-top: 6px; } }
 
   @media (max-width: 480px) {
     grid-template-columns: 1fr;
@@ -142,7 +190,7 @@ textarea { resize: vertical; line-height: 1.45; }
 
   li {
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 34px 1fr auto;
     align-items: center;
     gap: 12px;
     min-height: 56px;
@@ -155,6 +203,20 @@ textarea { resize: vertical; line-height: 1.45; }
   }
 
   .what { display: flex; flex-direction: column; min-width: 0; small { font-size: 0.8rem; } }
+
+  .thumb {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 50px;
+    overflow: hidden;
+    border-radius: 3px 5px 5px 3px;
+    font-weight: 700;
+    color: #fff;
+    background: color-mix(in srgb, var(--accent) 70%, var(--surface-2));
+
+    img { width: 100%; height: 100%; object-fit: cover; }
+  }
   .row-tools { display: flex; align-items: center; gap: 6px; }
   .tag { color: var(--amber); font-weight: 600; }
   .book-form { box-shadow: none; margin: 8px 0; }
@@ -193,7 +255,21 @@ textarea { resize: vertical; line-height: 1.45; }
   .hint { align-self: center; font-size: 0.78rem; }
   .form-actions { grid-column: 1 / -1; display: flex; gap: 8px; }
   .push { margin-left: auto; }
-  label:has(textarea) { grid-column: 1 / -1; }
+  label:has(textarea), .wide-all { grid-column: 1 / -1; }
+
+  .isbn { display: flex; gap: 6px; input { flex: 1; } button { flex: none; } }
+
+  .lookup {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: var(--surface-2);
+
+    img { width: 44px; height: 64px; object-fit: cover; border-radius: 3px; }
+    .warn { color: var(--amber); font-weight: 600; }
+  }
 
   @media (max-width: 760px) {
     grid-template-columns: repeat(2, minmax(0, 1fr));

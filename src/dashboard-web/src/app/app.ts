@@ -31,6 +31,7 @@ export class App {
     { path: '/fotos', label: 'Fotos', icon: 'image' },
     { path: '/viagens', label: 'Viagens', icon: 'plane' },
     { path: '/leituras', label: 'Leituras', icon: 'book' },
+    { path: '/saude', label: 'Saúde', icon: 'heart' },
     { path: '/compras', label: 'Compras', icon: 'cart' },
   ];
 

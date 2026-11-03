@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Dashboard.Api.Infrastructure;
+using Microsoft.Extensions.Options;
 
 namespace Dashboard.Api.Features.Books;
 
@@ -9,7 +10,7 @@ namespace Dashboard.Api.Features.Books;
 /// one small file, whole-file atomic rewrites, a lock around every change. The first read seeds a
 /// few example books so the tab isn't empty; delete them once real ones are in.
 /// </summary>
-public sealed class BookStore(DataDirectory dataDirectory, LocalClock clock)
+public sealed class BookStore(DataDirectory dataDirectory, LocalClock clock, IOptions<DashboardOptions> options)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     {
@@ -54,7 +55,15 @@ public sealed class BookStore(DataDirectory dataDirectory, LocalClock clock)
         }, ct);
 
     public Task<(BookList List, Book? Book)> UpdateStatusAsync(Guid id, UpdateStatus request, CancellationToken ct) =>
-        MutateBookAsync(id, b => WithStatus(b, request.Status) with { Rating = ValidRating(request.Rating) ?? b.Rating }, ct);
+        MutateBookAsync(id, b => WithStatus(b, request.Status) with
+        {
+            Rating = ValidRating(request.Rating) ?? b.Rating,
+            ReaderId = b.ReaderId ?? Clean(request.ReaderId),
+        }, ct);
+
+    /// <summary>Records whether the cover for the book's current ISBN is on disk.</summary>
+    public Task<(BookList List, Book? Book)> SetCoverAsync(Guid id, bool hasCover, CancellationToken ct) =>
+        MutateBookAsync(id, b => b with { HasCover = hasCover }, ct);
 
     public Task<(BookList List, Book? Book)> DeleteAsync(Guid id, CancellationToken ct) =>
         MutateAsync(books =>
@@ -68,6 +77,7 @@ public sealed class BookStore(DataDirectory dataDirectory, LocalClock clock)
     private Book Apply(Book b, SaveBook r)
     {
         var total = r.TotalPages is > 0 ? r.TotalPages : null;
+        var isbn = Isbn.Normalize(r.Isbn);
         var updated = WithStatus(b with { TotalPages = total }, r.Status) with
         {
             Title = r.Title.Trim(),
@@ -75,7 +85,14 @@ public sealed class BookStore(DataDirectory dataDirectory, LocalClock clock)
             Format = r.Format,
             Notes = Clean(r.Notes),
             Rating = ValidRating(r.Rating),
+            ReaderId = Clean(r.ReaderId),
+            Isbn = isbn,
+            // A new ISBN means a different edition: its cover is fetched again after the save.
+            HasCover = b.HasCover && isbn == b.Isbn,
         };
+        // Back on the wish list means not started: the form's old start date and page don't apply.
+        if (r.Status == BookStatus.QueroLer) return updated;
+
         // Dates and page typed in the form win over the ones the status change filled in.
         return updated with
         {
@@ -91,7 +108,9 @@ public sealed class BookStore(DataDirectory dataDirectory, LocalClock clock)
         var today = clock.Today;
         return status switch
         {
-            BookStatus.QueroLer => b with { Status = status, FinishedOn = null },
+            // Not started yet: no dates, bookmark back at the start (it'd be in limbo otherwise, with a
+            // start date that throws off the pace once the book is really begun).
+            BookStatus.QueroLer => b with { Status = status, StartedOn = null, FinishedOn = null, CurrentPage = 0 },
             BookStatus.Lendo => b with { Status = status, StartedOn = b.StartedOn ?? today, FinishedOn = null },
             BookStatus.Lido => b with
             {
@@ -107,13 +126,10 @@ public sealed class BookStore(DataDirectory dataDirectory, LocalClock clock)
 
     private BookList ToList(List<Book> books)
     {
-        var year = clock.Today.Year;
-        var readThisYear = books.Where(b => b.Status == BookStatus.Lido && b.FinishedOn?.Year == year).ToList();
         return new BookList(
             books.Where(b => b.Status == BookStatus.Lendo).OrderByDescending(b => b.StartedOn).ToList(),
             books.Where(b => b.Status == BookStatus.QueroLer).OrderBy(b => b.CreatedAt).ToList(),
             books.Where(b => b.Status is BookStatus.Lido or BookStatus.Abandonado).OrderByDescending(b => b.FinishedOn).ToList(),
-            new ReadingStats(year, readThisYear.Count, readThisYear.Sum(b => b.TotalPages ?? 0)),
             clock.Now);
     }
 
@@ -173,7 +189,9 @@ public sealed class BookStore(DataDirectory dataDirectory, LocalClock clock)
     {
         var today = clock.Today;
         var now = clock.Now;
-        return
+        var people = options.Value.People.Select(p => p.Id).ToArray();
+        string? Reader(int i) => people.Length > i ? people[i] : null;
+        List<Book> books =
         [
             new(Guid.NewGuid(), "Torto Arado", "Itamar Vieira Junior", BookStatus.Lendo, BookFormat.Fisico, 264, 142, today.AddDays(-12), null, null, "Emprestado da biblioteca, devolver até o fim do mês.", now),
             new(Guid.NewGuid(), "O Avesso da Pele", "Jeferson Tenório", BookStatus.Lendo, BookFormat.Ebook, 192, 40, today.AddDays(-3), null, null, null, now),
@@ -184,6 +202,9 @@ public sealed class BookStore(DataDirectory dataDirectory, LocalClock clock)
             new(Guid.NewGuid(), "Capitães da Areia", "Jorge Amado", BookStatus.Lido, BookFormat.Fisico, 280, 280, today.AddDays(-120), today.AddDays(-95), 4, null, now.AddDays(-130)),
             new(Guid.NewGuid(), "Grande Sertão: Veredas", "Guimarães Rosa", BookStatus.Abandonado, BookFormat.Fisico, 560, 130, today.AddDays(-200), today.AddDays(-170), null, "Tentar de novo com mais calma.", now.AddDays(-210)),
         ];
+        // Spread across the first two people (or just the first, in a one-person household).
+        int[] readers = [0, 1, 0, 1, 1, 0, 1, 0];
+        return books.Select((b, i) => b with { ReaderId = Reader(readers[i]) ?? Reader(0) }).ToList();
     }
 
     private sealed record BookFile(int Version, IReadOnlyList<Book>? Books);

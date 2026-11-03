@@ -1,13 +1,17 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
+import { Router } from '@angular/router';
 import { Clock, daysUntil, fmt } from '../core/clock';
-import { Book, BookFormat, BookStatus, SaveBook } from '../core/models';
-import { Books, FORMATS, STATUSES, bookProgress } from '../core/books';
+import { DashboardData } from '../core/dashboard-data';
+import { Book, BookFormat, BookLookup, BookStatus, SaveBook } from '../core/models';
+import { Books, FORMATS, STATUSES, bookProgress, coverUrl } from '../core/books';
+import { valueOf } from '../shared/resource-state';
 import { Icon } from '../shared/icon';
 
 /**
  * Leituras: books being read now (with the bookmark and a progress bar), the "quero ler" queue, and
- * what's been read, grouped by year with a star rating.
+ * what's been read, grouped by year with a star rating. Every book has a reader; the filter
+ * (?leitor=daniel) shows one person's shelf, so each tablet can be left on its owner.
  */
 @Component({
   selector: 'app-books-page',
@@ -17,26 +21,45 @@ import { Icon } from '../shared/icon';
   styleUrl: './books-page.scss',
 })
 export class BooksPage {
+  /** ?leitor=<person id>; empty shows everyone. */
+  readonly leitor = input<string>();
+
   private readonly books = inject(Books);
   private readonly clock = inject(Clock);
+  private readonly router = inject(Router);
+  private readonly data = inject(DashboardData);
   protected readonly statuses = STATUSES;
   protected readonly formats = FORMATS;
   protected readonly stars = [1, 2, 3, 4, 5];
   protected readonly error = this.books.error;
-  protected readonly stats = this.books.stats;
   protected readonly loading = computed(() => !this.books.res.hasValue() && !this.books.res.error());
+
+  protected readonly people = computed(() => valueOf(this.data.config)?.people ?? []);
+  /** The selected person, or null for "Todos" (also when the id in the URL isn't a known person). */
+  protected readonly reader = computed(() => this.people().find((p) => p.id === this.leitor()) ?? null);
+
+  /** Preselected in the form: the person whose shelf is open, or the first person under "Todos". */
+  protected readonly defaultReader = computed(() => this.reader()?.id ?? this.people()[0]?.id ?? null);
 
   /** 'new', a book id being edited, or null. */
   protected readonly editing = signal<string | null>(null);
   /** Status preselected in the "new" form, so "Adicionar à lista" opens as Quero ler. */
   protected readonly newStatus = signal<BookStatus>('lendo');
   protected readonly showFinished = signal(true);
+  /** ISBN lookup in the open form: what Open Library returned, or why it didn't. */
+  protected readonly lookup = signal<{ busy: boolean; found: BookLookup | null; error: string | null }>({ busy: false, found: null, error: null });
 
-  protected readonly reading = computed(() => this.books.reading().map((b) => this.view(b)));
-  protected readonly queue = computed(() => this.books.queue().map((b) => this.view(b)));
+  private readonly mine = (list: Book[]) => {
+    const id = this.reader()?.id;
+    // Books saved before readers existed have none; they stay on every shelf until edited.
+    return id ? list.filter((b) => !b.readerId || b.readerId === id) : list;
+  };
+
+  protected readonly reading = computed(() => this.mine(this.books.reading()).map((b) => this.view(b)));
+  protected readonly queue = computed(() => this.mine(this.books.queue()).map((b) => this.view(b)));
   protected readonly finishedByYear = computed(() => {
     const groups = new Map<string, ReturnType<BooksPage['view']>[]>();
-    for (const b of this.books.finished()) {
+    for (const b of this.mine(this.books.finished())) {
       const year = b.finishedOn?.slice(0, 4) ?? 'Sem data';
       groups.set(year, [...(groups.get(year) ?? []), this.view(b)]);
     }
@@ -46,6 +69,13 @@ export class BooksPage {
     [...this.books.reading(), ...this.books.queue(), ...this.books.finished()].find((b) => b.id === this.editing()),
   );
 
+  /** Header counters for this year, for the selected reader (or the whole house). */
+  protected readonly stats = computed(() => {
+    const year = String(this.clock.now().getFullYear());
+    const read = this.mine(this.books.finished()).filter((b) => b.status === 'lido' && b.finishedOn?.startsWith(year));
+    return { year, count: read.length, pages: read.reduce((sum, b) => sum + (b.totalPages ?? 0), 0) };
+  });
+
   private view(b: Book) {
     const now = this.clock.now();
     const progress = bookProgress(b);
@@ -53,6 +83,9 @@ export class BooksPage {
     return {
       ...b,
       progress,
+      cover: coverUrl(b),
+      // Only worth saying whose book it is when looking at everyone's shelf.
+      readerChip: this.reader() ? null : this.people().find((p) => p.id === b.readerId) ?? null,
       formatLabel: FORMATS.find((f) => f.value === b.format)?.label ?? '',
       since: b.startedOn ? `Desde ${fmt.dateOnlyShort(b.startedOn)}` : null,
       // Pages per day so far, and at that pace how long until the end. Only once there's some history.
@@ -67,9 +100,32 @@ export class BooksPage {
     };
   }
 
+  protected showReader(id: string | null) {
+    this.router.navigate([], { queryParams: { leitor: id }, replaceUrl: true });
+  }
+
   protected newBook(status: BookStatus) {
     this.newStatus.set(status);
-    this.editing.set('new');
+    this.open('new');
+  }
+
+  protected open(id: string | null) {
+    this.lookup.set({ busy: false, found: null, error: null });
+    this.editing.set(id);
+  }
+
+  /** Looks the ISBN up and fills title, author and pages; the cover is downloaded by the API on save. */
+  protected async findIsbn(form: HTMLFormElement) {
+    const field = (name: string) => form.elements.namedItem(name) as HTMLInputElement;
+    const isbn = field('isbn').value.trim();
+    if (!isbn) return;
+    this.lookup.set({ busy: true, found: null, error: null });
+    const { book, error } = await this.books.lookup(isbn);
+    this.lookup.set({ busy: false, found: book, error });
+    if (!book) return;
+    if (book.title) field('title').value = book.title;
+    if (book.author) field('author').value = book.author;
+    if (book.totalPages) field('totalPages').value = String(book.totalPages);
   }
 
   protected async save(event: Event, form: HTMLFormElement) {
@@ -88,11 +144,13 @@ export class BooksPage {
       finishedOn: text('finishedOn'),
       rating: num('rating'),
       notes: text('notes'),
+      readerId: text('readerId'),
+      isbn: text('isbn'),
     };
     if (!book.title) return;
     const id = this.editing();
     const ok = id && id !== 'new' ? await this.books.update(id, book) : await this.books.create(book);
-    if (ok) this.editing.set(null);
+    if (ok) this.open(null);
   }
 
   protected bump(b: Book, delta: number) {
@@ -108,7 +166,7 @@ export class BooksPage {
   }
 
   protected start(b: Book) {
-    this.books.setStatus(b.id, 'lendo');
+    this.books.setStatus(b.id, 'lendo', null, this.reader()?.id ?? null);
   }
 
   protected finish(b: Book) {
@@ -126,7 +184,7 @@ export class BooksPage {
   protected remove(b: Book) {
     if (confirm(`Excluir "${b.title}"?`)) {
       this.books.remove(b.id);
-      this.editing.set(null);
+      this.open(null);
     }
   }
 }

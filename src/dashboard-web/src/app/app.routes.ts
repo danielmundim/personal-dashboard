@@ -6,6 +6,7 @@ export const routes: Routes = [
   { path: 'fotos', title: 'Fotos · Painel da Casa', loadComponent: () => import('./pages/photos-page').then((m) => m.PhotosPage) },
   { path: 'viagens', title: 'Viagens · Painel da Casa', loadComponent: () => import('./pages/trips-page').then((m) => m.TripsPage) },
   { path: 'leituras', title: 'Leituras · Painel da Casa', loadComponent: () => import('./pages/books-page').then((m) => m.BooksPage) },
+  { path: 'saude', title: 'Saúde · Painel da Casa', loadComponent: () => import('./pages/health-page').then((m) => m.HealthPage) },
   { path: 'compras', title: 'Compras · Painel da Casa', loadComponent: () => import('./pages/shopping-page').then((m) => m.ShoppingPage) },
   { path: '**', redirectTo: '' },
 ];
