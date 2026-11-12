@@ -84,6 +84,7 @@ public sealed class BookStore(DataDirectory dataDirectory, LocalClock clock, IOp
             Author = Clean(r.Author),
             Format = r.Format,
             Notes = Clean(r.Notes),
+            Category = Clean(r.Category),
             Rating = ValidRating(r.Rating),
             ReaderId = Clean(r.ReaderId),
             Isbn = isbn,
@@ -204,7 +205,8 @@ public sealed class BookStore(DataDirectory dataDirectory, LocalClock clock, IOp
         ];
         // Spread across the first two people (or just the first, in a one-person household).
         int[] readers = [0, 1, 0, 1, 1, 0, 1, 0];
-        return books.Select((b, i) => b with { ReaderId = Reader(readers[i]) ?? Reader(0) }).ToList();
+        string[] categories = ["Literatura brasileira", "Literatura brasileira", "Clássicos", "Ficção", "História", "Literatura brasileira", "Literatura brasileira", "Clássicos"];
+        return books.Select((b, i) => b with { ReaderId = Reader(readers[i]) ?? Reader(0), Category = categories[i] }).ToList();
     }
 
     private sealed record BookFile(int Version, IReadOnlyList<Book>? Books);

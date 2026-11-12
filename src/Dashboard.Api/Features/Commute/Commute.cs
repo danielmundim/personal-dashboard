@@ -31,7 +31,18 @@ public sealed record DriveEstimate(
     DateTimeOffset ArriveIfLeavingNow,
     IReadOnlyList<TypicalTime> Today,
     string? Incident,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    ReturnTrip? Return = null);
+
+/// <summary>The same drive the other way (destination → home), read at the same moment.</summary>
+public sealed record ReturnTrip(
+    int CurrentMinutes,
+    int UsualMinutes,
+    UsualSource UsualSource,
+    double DistanceKm,
+    string Via,
+    TrafficLevel Traffic,
+    DateTimeOffset ArriveIfLeavingNow);
 
 /// <summary>
 /// Real implementation: Google Routes API (traffic-aware). Waze's live-map routing endpoints reject

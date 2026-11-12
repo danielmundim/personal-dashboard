@@ -91,9 +91,36 @@ export const FORMATS: { value: BookFormat; label: string }[] = [
   { value: 'audiobook', label: 'Audiolivro' },
 ];
 
+/** Offered in the form next to the categories already in use; any other text works too. */
+export const CATEGORY_SUGGESTIONS = [
+  'Fantasia', 'Ficção', 'Ficção científica', 'Romance', 'Literatura brasileira', 'Clássicos', 'Poesia',
+  'História', 'História do Brasil', 'Política', 'Biografia', 'Ciência', 'Psicologia', 'Filosofia',
+  'Finanças', 'Negócios', 'Tecnologia', 'Autoajuda', 'Infantil',
+];
+
+/** Shelf label for books without a category. */
+export const NO_CATEGORY = 'Sem categoria';
+
 /** Served by the API from the downloaded copy; the ISBN busts the browser cache when the edition changes. */
 export function coverUrl(b: Book) {
   return b.hasCover ? `/api/books/${b.id}/cover?v=${b.isbn}` : null;
+}
+
+/**
+ * How long a finished book took, start to finish, counting both days ("1 dia" when started and
+ * finished the same day): days up to two weeks, then weeks, then months. Null without both dates,
+ * and for books started and finished on the day they were added: those were logged after the fact
+ * and the dates are just the day of entry, not how long the reading took.
+ */
+export function readingTime(b: Book) {
+  if (b.status !== 'lido' || !b.startedOn || !b.finishedOn) return null;
+  if (b.startedOn === b.finishedOn && b.finishedOn === b.createdAt.slice(0, 10)) return null;
+  const days = Math.round((Date.parse(b.finishedOn) - Date.parse(b.startedOn)) / 86_400_000) + 1;
+  if (days < 1) return null;
+  if (days < 14) return days === 1 ? '1 dia' : `${days} dias`;
+  if (days < 60) return `${Math.round(days / 7)} sem.`;
+  const months = Math.round(days / 30);
+  return months === 1 ? '1 mês' : `${months} meses`;
 }
 
 /** Reading progress, e.g. { pct: 54, left: 122 }; null without a page count. */

@@ -114,15 +114,16 @@ public static class DashboardEndpoints
         g.MapGet("/", (PhotoStore s, CancellationToken ct) => s.ListAsync(ct));
 
         // LAN-only dashboard without accounts, so the form upload skips antiforgery tokens.
-        // Optional form fields "album" and "caption" apply to every file in the upload.
+        // Optional form fields "album", "caption", "country" and "city" apply to every file in the upload.
         g.MapPost("/", async (HttpRequest request, PhotoStore s, CancellationToken ct) =>
             {
                 var form = await request.ReadFormAsync(ct);
                 if (form.Files.Count == 0) return Results.BadRequest("Nenhum arquivo foi enviado.");
+                var place = await s.LocateAsync(form["country"], form["city"], ct);
                 var saved = new List<Photo>();
                 try
                 {
-                    foreach (var f in form.Files) saved.Add(await s.SaveAsync(f, form["album"], form["caption"], ct));
+                    foreach (var f in form.Files) saved.Add(await s.SaveAsync(f, form["album"], form["caption"], place, ct));
                 }
                 catch (BadHttpRequestException ex)
                 {

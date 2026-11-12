@@ -71,6 +71,7 @@ public static class BookEndpoints
         if (r.TotalPages is < 0 or > 20000) errors["totalPages"] = ["Número de páginas inválido."];
         if (r.CurrentPage is < 0) errors["currentPage"] = ["A página não pode ser negativa."];
         if (r.StartedOn is { } s && r.FinishedOn is { } f && f < s) errors["finishedOn"] = ["O fim não pode ser antes do início."];
+        if ((r.Category?.Length ?? 0) > 40) errors["category"] = ["A categoria pode ter até 40 caracteres."];
         if ((r.Notes?.Length ?? 0) > 4000) errors["notes"] = ["As notas podem ter até 4000 caracteres."];
         if (!string.IsNullOrWhiteSpace(r.Isbn) && Isbn.Normalize(r.Isbn) is null) errors["isbn"] = ["O ISBN deve ter 10 ou 13 dígitos."];
         // Required whenever the household is configured: every book is someone's.

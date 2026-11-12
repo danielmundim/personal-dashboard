@@ -86,8 +86,9 @@ public sealed class CommuteOptions
     public int NightRefreshMinutes { get; init; } = 60;
 
     /// <summary>
-    /// Server cache lifetime for the drive time at <paramref name="now"/>. With the defaults that is about
-    /// 100 requests a day (~3,100 a month), however many screens are open.
+    /// Server cache lifetime for the drive time at <paramref name="now"/>. Each reading asks for both
+    /// directions (to work and back home), so with the defaults that is about 200 requests a day
+    /// (~6,200 a month), however many screens are open.
     /// </summary>
     public TimeSpan CacheTtl(DateTimeOffset now) =>
         TimeSpan.FromMinutes(now.Hour >= ActiveFromHour && now.Hour < ActiveToHour ? RefreshMinutes : NightRefreshMinutes);

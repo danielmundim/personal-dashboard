@@ -4,13 +4,19 @@ import { Router } from '@angular/router';
 import { Clock, daysUntil, fmt } from '../core/clock';
 import { DashboardData } from '../core/dashboard-data';
 import { Book, BookFormat, BookLookup, BookStatus, SaveBook } from '../core/models';
-import { Books, FORMATS, STATUSES, bookProgress, coverUrl } from '../core/books';
+import { Books, CATEGORY_SUGGESTIONS, FORMATS, NO_CATEGORY, STATUSES, bookProgress, coverUrl, readingTime } from '../core/books';
 import { valueOf } from '../shared/resource-state';
 import { Icon } from '../shared/icon';
 
+const LAYOUT_KEY = 'dashboard.books.layout';
+type Layout = 'estantes' | 'lista';
+type BookView = ReturnType<BooksPage['view']>;
+
 /**
  * Leituras: books being read now (with the bookmark and a progress bar), the "quero ler" queue, and
- * what's been read, grouped by year with a star rating. Every book has a reader; the filter
+ * what's been read with a star rating. The queue and the read books show either as shelves by
+ * category (covers side by side; tapping one opens its line below the shelf) or as plain lists, the
+ * read ones grouped by year. The choice is remembered per tablet. Every book has a reader; the filter
  * (?leitor=daniel) shows one person's shelf, so each tablet can be left on its owner.
  */
 @Component({
@@ -46,6 +52,9 @@ export class BooksPage {
   /** Status preselected in the "new" form, so "Adicionar à lista" opens as Quero ler. */
   protected readonly newStatus = signal<BookStatus>('lendo');
   protected readonly showFinished = signal(true);
+  protected readonly layout = signal<Layout>(readLayout());
+  /** The book tapped on a shelf, whose line (with its actions) opens under that shelf. */
+  protected readonly selected = signal<string | null>(null);
   /** ISBN lookup in the open form: what Open Library returned, or why it didn't. */
   protected readonly lookup = signal<{ busy: boolean; found: BookLookup | null; error: string | null }>({ busy: false, found: null, error: null });
 
@@ -65,6 +74,17 @@ export class BooksPage {
     }
     return [...groups].map(([year, books]) => ({ year, books }));
   });
+  protected readonly queueShelves = computed(() => this.shelves(this.queue()));
+  protected readonly finishedShelves = computed(() => this.shelves(this.mine(this.books.finished()).map((b) => this.view(b))));
+
+  /** For the form's datalist: categories already on the shelves first, then the usual ones. */
+  protected readonly categories = computed(() => {
+    const all = [...this.books.reading(), ...this.books.queue(), ...this.books.finished()];
+    const used = new Map(all.filter((b) => b.category).map((b) => [b.category!.toLocaleLowerCase('pt-BR'), b.category!]));
+    for (const c of CATEGORY_SUGGESTIONS) if (!used.has(c.toLocaleLowerCase('pt-BR'))) used.set(c.toLocaleLowerCase('pt-BR'), c);
+    return [...used.values()];
+  });
+
   protected readonly editingBook = computed(() =>
     [...this.books.reading(), ...this.books.queue(), ...this.books.finished()].find((b) => b.id === this.editing()),
   );
@@ -75,6 +95,22 @@ export class BooksPage {
     const read = this.mine(this.books.finished()).filter((b) => b.status === 'lido' && b.finishedOn?.startsWith(year));
     return { year, count: read.length, pages: read.reduce((sum, b) => sum + (b.totalPages ?? 0), 0) };
   });
+
+  /** One shelf per category (case-insensitive), alphabetical, with "Sem categoria" at the end. */
+  private shelves(books: BookView[]) {
+    const groups = new Map<string, { name: string; books: BookView[] }>();
+    for (const b of books) {
+      const name = b.category ?? NO_CATEGORY;
+      const key = name.toLocaleLowerCase('pt-BR');
+      const g = groups.get(key) ?? { name, books: [] };
+      g.books.push(b);
+      groups.set(key, g);
+    }
+    const selected = this.selected();
+    return [...groups.values()]
+      .sort((a, b) => (a.name === NO_CATEGORY ? 1 : b.name === NO_CATEGORY ? -1 : a.name.localeCompare(b.name, 'pt-BR')))
+      .map((g) => ({ ...g, selected: g.books.find((b) => b.id === selected) ?? null }));
+  }
 
   private view(b: Book) {
     const now = this.clock.now();
@@ -97,7 +133,24 @@ export class BooksPage {
           })()
         : null,
       finished: b.finishedOn ? fmt.dateOnlyShort(b.finishedOn) : null,
+      took: readingTime(b),
     };
+  }
+
+  protected setLayout(layout: Layout) {
+    this.layout.set(layout);
+    try {
+      localStorage.setItem(LAYOUT_KEY, layout);
+    } catch {
+      // Private mode or blocked storage: the choice just isn't remembered.
+    }
+  }
+
+  /** Tapping the open book again closes its line (and its form). */
+  protected select(id: string) {
+    const next = this.selected() === id ? null : id;
+    if (this.editing() && this.editing() !== 'new') this.open(null);
+    this.selected.set(next);
   }
 
   protected showReader(id: string | null) {
@@ -146,6 +199,7 @@ export class BooksPage {
       notes: text('notes'),
       readerId: text('readerId'),
       isbn: text('isbn'),
+      category: text('category'),
     };
     if (!book.title) return;
     const id = this.editing();
@@ -186,5 +240,13 @@ export class BooksPage {
       this.books.remove(b.id);
       this.open(null);
     }
+  }
+}
+
+function readLayout(): Layout {
+  try {
+    return localStorage.getItem(LAYOUT_KEY) === 'lista' ? 'lista' : 'estantes';
+  } catch {
+    return 'estantes';
   }
 }

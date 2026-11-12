@@ -25,19 +25,70 @@ public sealed class GoogleRoutesCommuteProvider(
         var o = options.Value;
         var commute = o.Commute;
 
+        // Both directions at once: two billed requests per reading.
+        var toWorkTask = RouteAsync(o.Home, commute.Destination, cancellationToken);
+        var backTask = RouteAsync(commute.Destination, o.Home, cancellationToken);
+        var toWork = await toWorkTask;
+        var back = await backTask;
+
+        var now = clock.Now;
+        var there = await ReadAsync(toWork, now, back: false, cancellationToken);
+        var home = await ReadAsync(back, now, back: true, cancellationToken);
+
+        return new DriveEstimate(
+            commute.Label,
+            commute.Destination.Name,
+            there.CurrentMinutes,
+            there.UsualMinutes,
+            there.UsualSource,
+            there.DistanceKm,
+            there.Via,
+            there.Traffic,
+            there.ArriveIfLeavingNow,
+            await history.TypicalDayAsync(commute.ActiveFromHour, commute.ActiveToHour, cancellationToken),
+            Incident: null,
+            now,
+            home);
+    }
+
+    /// <summary>Turns a route into a reading and records it in that direction's history.</summary>
+    private async Task<ReturnTrip> ReadAsync(Route route, DateTimeOffset now, bool back, CancellationToken ct)
+    {
+        var current = Minutes(route.Duration);
+        var freeFlow = Minutes(route.StaticDuration ?? route.Duration);
+
+        // Usual = our own median for this hour before today's reading is added, so a jam doesn't drag it up.
+        var usual = await history.UsualAtAsync(now, ct, back);
+        await history.RecordAsync(now, current, ct, back);
+
+        var ratio = freeFlow > 0 ? (double)current / freeFlow : 1;
+        var traffic = ratio switch { < 1.15 => TrafficLevel.Light, < 1.4 => TrafficLevel.Moderate, _ => TrafficLevel.Heavy };
+
+        return new ReturnTrip(
+            current,
+            usual ?? freeFlow,
+            usual is null ? UsualSource.FreeFlow : UsualSource.History,
+            Math.Round(route.DistanceMeters / 1000.0, 1),
+            string.IsNullOrWhiteSpace(route.Description) ? "Rota mais rápida" : route.Description,
+            traffic,
+            now.AddMinutes(current));
+    }
+
+    private async Task<Route> RouteAsync(PlaceOptions from, PlaceOptions to, CancellationToken cancellationToken)
+    {
         using var request = new HttpRequestMessage(HttpMethod.Post, "directions/v2:computeRoutes")
         {
             Content = JsonContent.Create(new
             {
-                origin = Waypoint(o.Home),
-                destination = Waypoint(commute.Destination),
+                origin = Waypoint(from),
+                destination = Waypoint(to),
                 travelMode = "DRIVE",
                 routingPreference = "TRAFFIC_AWARE",
                 languageCode = "pt-BR",
                 units = "METRIC",
             }),
         };
-        request.Headers.Add("X-Goog-Api-Key", commute.GoogleApiKey);
+        request.Headers.Add("X-Goog-Api-Key", options.Value.Commute.GoogleApiKey);
         request.Headers.Add("X-Goog-FieldMask", FieldMask);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
@@ -51,33 +102,8 @@ public sealed class GoogleRoutesCommuteProvider(
         }
 
         var result = await response.Content.ReadFromJsonAsync<RoutesResponse>(cancellationToken);
-        var route = result?.Routes?.FirstOrDefault()
-            ?? throw new InvalidOperationException("Google Routes found no route between home and the destination.");
-
-        var now = clock.Now;
-        var current = Minutes(route.Duration);
-        var freeFlow = Minutes(route.StaticDuration ?? route.Duration);
-
-        // Usual = our own median for this hour before today's reading is added, so a jam doesn't drag it up.
-        var usual = await history.UsualAtAsync(now, cancellationToken);
-        await history.RecordAsync(now, current, cancellationToken);
-
-        var ratio = freeFlow > 0 ? (double)current / freeFlow : 1;
-        var traffic = ratio switch { < 1.15 => TrafficLevel.Light, < 1.4 => TrafficLevel.Moderate, _ => TrafficLevel.Heavy };
-
-        return new DriveEstimate(
-            commute.Label,
-            commute.Destination.Name,
-            current,
-            usual ?? freeFlow,
-            usual is null ? UsualSource.FreeFlow : UsualSource.History,
-            Math.Round(route.DistanceMeters / 1000.0, 1),
-            string.IsNullOrWhiteSpace(route.Description) ? "Rota mais rápida" : route.Description,
-            traffic,
-            now.AddMinutes(current),
-            await history.TypicalDayAsync(commute.ActiveFromHour, commute.ActiveToHour, cancellationToken),
-            Incident: null,
-            now);
+        return result?.Routes?.FirstOrDefault()
+            ?? throw new InvalidOperationException($"Google Routes found no route from {from.Name} to {to.Name}.");
     }
 
     private static object Waypoint(PlaceOptions place) =>

@@ -37,6 +37,7 @@ public static class ProviderRegistration
         // Interactive lookups from the form: a short timeout beats retries, the person is waiting.
         services.AddHttpClient<Dashboard.Api.Features.Books.OpenLibrary>(c => c.Timeout = TimeSpan.FromSeconds(10));
         services.AddTransient<Dashboard.Api.Features.Books.BookCovers>(); // transient: it holds the typed HttpClient
+        services.AddHttpClient<PlaceGeocoder>(c => c.Timeout = TimeSpan.FromSeconds(10));
         services.AddSingleton<PhotoStore>();
 
         // Widgets backed by external services talk through one interface each. Dashboard:Integrations

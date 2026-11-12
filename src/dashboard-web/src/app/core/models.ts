@@ -150,6 +150,18 @@ export interface DriveEstimate {
   today: { hour: string; minutes: number }[];
   incident: string | null;
   updatedAt: string;
+  /** Same drive the other way (destination → home), read at the same moment. */
+  return: ReturnTrip | null;
+}
+
+export interface ReturnTrip {
+  currentMinutes: number;
+  usualMinutes: number;
+  usualSource: 'history' | 'freeFlow';
+  distanceKm: number;
+  via: string;
+  traffic: 'light' | 'moderate' | 'heavy';
+  arriveIfLeavingNow: string;
 }
 
 export interface CityEventList {
@@ -219,6 +231,11 @@ export interface Photo {
   /** Moment or trip the photo belongs to, e.g. "Lisboa 2026". */
   album: string | null;
   caption: string | null;
+  /** Where it was taken, as typed. Coordinates are looked up by the API and are null if the place wasn't found. */
+  country: string | null;
+  city: string | null;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 export interface AlbumSummary {
@@ -227,9 +244,20 @@ export interface AlbumSummary {
   coverUrl: string;
 }
 
+/** One pin on the globe: the located photos of a city, or of a country when no city was given. */
+export interface PlaceSummary {
+  country: string;
+  city: string | null;
+  count: number;
+  coverUrl: string;
+  latitude: number;
+  longitude: number;
+}
+
 export interface PhotoList {
   photos: Photo[];
   albums: AlbumSummary[];
+  places: PlaceSummary[];
   rotateSeconds: number;
 }
 
@@ -359,6 +387,8 @@ export interface Book {
   isbn: string | null;
   /** The cover was downloaded and is served from /api/books/{id}/cover. */
   hasCover: boolean;
+  /** Free text, picks the shelf in the Estantes view; null is "Sem categoria". */
+  category: string | null;
 }
 
 export interface BookList {
@@ -382,6 +412,7 @@ export interface SaveBook {
   notes: string | null;
   readerId: string | null;
   isbn: string | null;
+  category: string | null;
 }
 
 /** Open Library's details for an ISBN, used to prefill the form. */

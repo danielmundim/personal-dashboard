@@ -19,10 +19,8 @@ import { tileState, valueOf } from '../shared/resource-state';
         @for (p of photos(); track p.id; let i = $index) {
           <img [src]="p.url" alt="" [class.shown]="i === index()" [attr.loading]="i === index() ? 'eager' : 'lazy'" />
         }
-        @if (current(); as c) {
-          @if (c.album || c.caption) {
-            <span class="label">{{ c.caption ?? '' }}{{ c.caption && c.album ? ' · ' : '' }}{{ c.album ?? '' }}</span>
-          }
+        @if (label()) {
+          <span class="label">{{ label() }}</span>
         }
         @if (photos().length > 1) {
           <button type="button" class="nav prev" (click)="step(-1)" aria-label="Foto anterior"><app-icon name="chevronLeft" [size]="20" /></button>
@@ -62,6 +60,11 @@ export class PhotosTile {
   protected readonly isSample = computed(() => this.photos().some((p) => p.sample));
   protected readonly index = signal(0);
   protected readonly current = computed(() => this.photos()[this.index()]);
+  /** Caption · album · where it was taken, whichever the photo has. */
+  protected readonly label = computed(() => {
+    const c = this.current();
+    return c ? [c.caption, c.album, c.city ?? c.country].filter(Boolean).join(' · ') : '';
+  });
   protected readonly meta = computed(() => (this.photos().length ? `${this.index() + 1} / ${this.photos().length}` : ''));
   protected readonly uploading = signal(false);
   protected readonly error = signal<string | null>(null);

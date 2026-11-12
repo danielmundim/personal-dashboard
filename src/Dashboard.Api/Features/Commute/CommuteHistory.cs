@@ -5,8 +5,8 @@ namespace Dashboard.Api.Features.Commute;
 
 /// <summary>
 /// Remembers past drive-time readings so "usual" means usual for us: the median for the same hour
-/// on the same kind of day (weekday or weekend). Getting a typical-day curve from Google directly
-/// would cost one paid request per hour of the day, so we build it up from readings we already make.
+/// on the same kind of day (weekday or weekend), kept apart per direction (to work / back home).
+/// Getting a typical-day curve from Google directly would cost one paid request per hour of the day, so we build it up from readings we already make.
 /// </summary>
 public sealed class CommuteHistory(DataDirectory dataDirectory, LocalClock clock)
 {
@@ -20,13 +20,13 @@ public sealed class CommuteHistory(DataDirectory dataDirectory, LocalClock clock
 
     private string FilePath => Path.Combine(dataDirectory.Root, "commute-history.json");
 
-    public async Task RecordAsync(DateTimeOffset at, int minutes, CancellationToken ct)
+    public async Task RecordAsync(DateTimeOffset at, int minutes, CancellationToken ct, bool back = false)
     {
         await _gate.WaitAsync(ct);
         try
         {
             var readings = await LoadAsync(ct);
-            readings.Add(new Reading(at, minutes));
+            readings.Add(new Reading(at, minutes, back));
             readings.RemoveAll(r => r.At < at.AddDays(-KeepDays));
             var tmp = FilePath + ".tmp";
             await File.WriteAllTextAsync(tmp, JsonSerializer.Serialize(readings, Json), ct);
@@ -39,9 +39,9 @@ public sealed class CommuteHistory(DataDirectory dataDirectory, LocalClock clock
     }
 
     /// <summary>Median minutes for this hour on this kind of day, or null without enough samples.</summary>
-    public async Task<int?> UsualAtAsync(DateTimeOffset at, CancellationToken ct)
+    public async Task<int?> UsualAtAsync(DateTimeOffset at, CancellationToken ct, bool back = false)
     {
-        var bucket = await SamplesAsync(IsWeekend(at), at.Hour, ct);
+        var bucket = await SamplesAsync(IsWeekend(at), at.Hour, back, ct);
         return Enough(bucket) ? Median(bucket.Select(b => b.Minutes).ToList()) : null;
     }
 
@@ -53,7 +53,7 @@ public sealed class CommuteHistory(DataDirectory dataDirectory, LocalClock clock
         var curve = new List<TypicalTime>();
         for (var h = fromHour; h <= toHour; h++)
         {
-            var bucket = await SamplesAsync(weekend, h, ct);
+            var bucket = await SamplesAsync(weekend, h, back: false, ct);
             if (Enough(bucket)) curve.Add(new TypicalTime(clock.At(today, h), Median(bucket.Select(b => b.Minutes).ToList())));
         }
         return curve;
@@ -62,12 +62,13 @@ public sealed class CommuteHistory(DataDirectory dataDirectory, LocalClock clock
     private static bool Enough(List<(DateOnly Day, int Minutes)> bucket) =>
         bucket.Count >= MinSamples && bucket.Select(b => b.Day).Distinct().Count() >= MinDays;
 
-    private async Task<List<(DateOnly Day, int Minutes)>> SamplesAsync(bool weekend, int hour, CancellationToken ct)
+    private async Task<List<(DateOnly Day, int Minutes)>> SamplesAsync(bool weekend, int hour, bool back, CancellationToken ct)
     {
         await _gate.WaitAsync(ct);
         try
         {
             return (await LoadAsync(ct))
+                .Where(r => r.Back == back)
                 .Select(r => (Local: TimeZoneInfo.ConvertTime(r.At, clock.TimeZone), r.Minutes))
                 .Where(r => IsWeekend(r.Local) == weekend && r.Local.Hour == hour)
                 .Select(r => (DateOnly.FromDateTime(r.Local.DateTime), r.Minutes))
@@ -96,5 +97,6 @@ public sealed class CommuteHistory(DataDirectory dataDirectory, LocalClock clock
         return sorted.Count % 2 == 1 ? sorted[mid] : (int)Math.Round((sorted[mid - 1] + sorted[mid]) / 2.0);
     }
 
-    private sealed record Reading(DateTimeOffset At, int Minutes);
+    /// <summary>Back = destination → home. Readings saved before the return trip existed load as false.</summary>
+    private sealed record Reading(DateTimeOffset At, int Minutes, bool Back = false);
 }

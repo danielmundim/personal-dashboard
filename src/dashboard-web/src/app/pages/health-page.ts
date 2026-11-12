@@ -36,10 +36,11 @@ const TONE_HEX: Record<Accent, string> = {
   sky: 'var(--sky)', amber: 'var(--amber)', green: 'var(--green)', violet: 'var(--violet)', rose: 'var(--rose)', teal: 'var(--teal)',
 };
 
-// Chart canvas, in SVG user units.
+// Chart canvas, in SVG user units. The right gutter holds the latest-value and goal labels.
 const W = 640;
-const H = 200;
-const PAD = { top: 12, right: 12, bottom: 24, left: 36 };
+const PAD = { top: 18, right: 66, bottom: 26, left: 40 };
+/** Panel height: one tall chart for a single person, shorter stacked panels for several. */
+const chartHeight = (panels: number) => (panels > 1 ? 172 : 230);
 
 /**
  * Saúde: weight progress toward each person's goal, the status of every exam marker by area (as of
@@ -164,47 +165,141 @@ export class HealthPage {
     return odd;
   });
 
+  /**
+   * One panel per person, sharing the time axis but each with its own weight scale: two people's
+   * weights are far apart, and a shared scale flattens both lines.
+   */
   protected readonly chart = computed(() => {
     const data = this.data();
     if (!data) return null;
     const to = this.asOf();
-    const shown = this.shown();
     const from = this.chartFrom();
-    const span = Math.max(1, dayDiff(from, to));
 
-    const series = shown.map((p) => {
+    const series = this.shown().map((p) => {
       const points = weightsFor(data.weights, p.id, from, to);
       const goal = data.profiles.find((x) => x.personId === p.id)?.goalWeightKg ?? null;
       return { person: p, color: TONE_HEX[p.color] ?? 'var(--accent)', points, goal };
     }).filter((s) => s.points.length);
     if (!series.length) return null;
 
-    const values = series.flatMap((s) => [...s.points.map((w) => w.kg), ...(s.goal !== null ? [s.goal] : [])]);
-    const lo = Math.floor(Math.min(...values) - 1);
-    const hi = Math.ceil(Math.max(...values) + 1);
-    const x = (d: string) => PAD.left + (dayDiff(from, d) / span) * (W - PAD.left - PAD.right);
-    const y = (v: number) => PAD.top + ((hi - v) / (hi - lo)) * (H - PAD.top - PAD.bottom);
+    // Start at the first weigh-in in the period, so a short history isn't squeezed into one corner.
+    let start = series.reduce((d, s) => (s.points[0].date < d ? s.points[0].date : d), to);
+    if (dayDiff(start, to) < 6) start = addDays(to, -6);
+    const span = dayDiff(start, to);
+    const h = chartHeight(series.length);
+    const top = PAD.top, bottom = h - PAD.bottom, left = PAD.left, right = W - PAD.right;
+    const x = (d: string) => left + (dayDiff(start, d) / span) * (right - left);
+    const xTicks = dateTicks(start, to).map((t) => ({ ...t, x: x(t.day) })).filter((t) => t.x - left > 18 || t.x === left);
+    const odd = this.oddWeights();
+    const many = Math.max(...series.map((s) => s.points.length)) > 60;
 
-    const ticks = [hi, Math.round((hi + lo) / 2), lo].map((v) => ({ y: y(v), label: String(v) }));
-    const dates = [from, addDays(from, Math.round(span / 2)), to].map((d) => ({ x: x(d), label: `${new Date(d).getUTCDate()} ${fmt.dateOnlyMonthShort(d)}` }));
+    const panels = series.map((s) => {
+      const kgs = s.points.map((w) => w.kg);
+      // 7-day average: smoother than the daily readings, which swing with water and salt.
+      const avgs = s.points.map((w) => weekAverage(data.weights, s.person.id, w.date)!);
+      let lo = Math.min(...kgs, ...avgs), hi = Math.max(...kgs, ...avgs);
+      // Pull the goal into the scale only when it's close; a far-away goal would flatten the line,
+      // so it gets an arrow label at the edge instead.
+      const near = s.goal !== null && s.goal >= lo - Math.max(2, hi - lo) && s.goal <= hi + Math.max(2, hi - lo);
+      if (near) { lo = Math.min(lo, s.goal!); hi = Math.max(hi, s.goal!); }
+      const scale = niceScale(lo, hi);
+      const y = (v: number) => top + ((scale.hi - v) / (scale.hi - scale.lo)) * (bottom - top);
 
+      const dots = s.points.map((w, i) => ({
+        id: w.id, date: w.date, kg: w.kg, avg: avgs[i], cx: x(w.date), cy: y(w.kg), ay: y(avgs[i]), odd: odd.has(w.id),
+      }));
+      const last = dots[dots.length - 1];
+      const line = dots.length >= 3 ? dots.map((d, i) => `${i ? 'L' : 'M'}${d.cx.toFixed(1)},${d.ay.toFixed(1)}`).join(' ') : null;
+
+      // Min/max labels, skipped when they'd sit on the latest point (it has its own label).
+      const extreme = (pick: (a: number, b: number) => boolean, above: boolean) => {
+        const i = kgs.reduce((best, v, j) => (pick(v, kgs[best]) ? j : best), 0);
+        const d = dots[i];
+        if (dots.length < 3 || i === dots.length - 1 || Math.abs(d.cx - last.cx) < 30) return null;
+        const anchor = d.cx < left + 40 ? 'start' : d.cx > right - 40 ? 'end' : 'middle';
+        return { tx: anchor === 'start' ? d.cx - 4 : anchor === 'end' ? d.cx + 4 : d.cx, ty: above ? d.cy - 8 : d.cy + 15, anchor, label: `${above ? 'máx' : 'mín'} ${kg(d.kg)}` };
+      };
+
+      let endY = clamp(last.cy + 4, top + 4, bottom);
+      let goal: { y: number | null; ty: number; label: string } | null = null;
+      if (s.goal !== null) {
+        const gy = near ? y(s.goal) : null;
+        let ty = gy !== null ? gy + 4 : s.goal < scale.lo ? bottom - 2 : top + 8;
+        // Keep the goal label from overlapping the latest-value label in the gutter.
+        if (Math.abs(ty - endY) < 13) {
+          if (ty >= endY) ty = Math.min(bottom + 8, endY + 13);
+          else ty = Math.max(top - 4, endY - 13);
+          if (Math.abs(ty - endY) < 13) endY = ty >= endY ? ty - 13 : ty + 13;
+        }
+        goal = { y: gy, ty, label: gy !== null ? `meta ${num(s.goal)}` : `${s.goal < scale.lo ? '↓' : '↑'} meta ${num(s.goal)}` };
+      }
+
+      const days = dayDiff(s.points[0].date, last.date);
+      const change = days >= 3 ? avgs[avgs.length - 1] - avgs[0] : null;
+      return {
+        person: s.person,
+        color: s.color,
+        yTicks: scale.ticks.map((v) => ({ y: y(v), label: scale.step < 1 ? kg(v) : num(v) })),
+        dots,
+        line,
+        area: line ? `${line} L${last.cx.toFixed(1)},${bottom} L${dots[0].cx.toFixed(1)},${bottom} Z` : null,
+        max: extreme((a, b) => a > b, true),
+        min: extreme((a, b) => a < b, false),
+        last,
+        end: { y: endY, label: kg(last.kg) },
+        goal,
+        change: change !== null ? `${signedKg(change)} kg` : null,
+        changeDown: change !== null && change < 0,
+        changeSpan: change !== null ? `em ${ago(days)}` : null,
+      };
+    });
+
+    return { w: W, h, top, bottom, left, right, xTicks, panels, many, gradient: `wg-${this.uid}` };
+  });
+
+  /** Unique id prefix for SVG gradients, in case the page is ever rendered twice. */
+  private readonly uid = Math.random().toString(36).slice(2, 8);
+
+  /** The point under the finger or mouse, per panel: hover on desktop, tap on the tablets. */
+  protected readonly hover = signal<{ personId: string; id: string } | null>(null);
+  protected readonly tip = computed(() => {
+    const h = this.hover();
+    const ch = this.chart();
+    const panel = h && ch?.panels.find((p) => p.person.id === h.personId);
+    const d = panel?.dots.find((x) => x.id === h!.id);
+    if (!ch || !panel || !d) return null;
+    const xPct = (d.cx / ch.w) * 100;
+    // Above the higher of the two marks, or below the lower one when there's no room above.
+    const below = Math.min(d.cy, d.ay) < ch.h * 0.38;
     return {
-      w: W, h: H, ticks, dates, left: PAD.left, right: W - PAD.right,
-      series: series.map((s) => ({
-        ...s,
-        dots: s.points.map((w) => ({
-          id: w.id,
-          cx: x(w.date),
-          cy: y(w.kg),
-          odd: this.oddWeights().has(w.id),
-          title: `${s.person.name} · ${fmt.dateOnlyShort(w.date)} · ${kg(w.kg)} kg`,
-        })),
-        // 7-day average line: smoother than the daily readings, which swing with water and salt.
-        trend: s.points.map((w) => `${x(w.date).toFixed(1)},${y(weekAverage(data.weights, s.person.id, w.date)!).toFixed(1)}`).join(' '),
-        goalY: s.goal !== null ? y(s.goal) : null,
-      })),
+      personId: panel.person.id,
+      dot: d,
+      color: panel.color,
+      left: xPct,
+      top: ((below ? Math.max(d.cy, d.ay) : Math.min(d.cy, d.ay)) / ch.h) * 100,
+      align: xPct < 22 ? 'start' : xPct > 70 ? 'end' : 'middle',
+      below,
+      when: `${fmt.dateOnlyShort(d.date)} ${d.date.slice(0, 4)}`,
+      kg: kg(d.kg),
+      avg: kg(d.avg),
     };
   });
+
+  protected pointAt(ev: PointerEvent, personId: string) {
+    const ch = this.chart();
+    const panel = ch?.panels.find((p) => p.person.id === personId);
+    if (!ch || !panel) return;
+    const box = (ev.currentTarget as Element).getBoundingClientRect();
+    const ux = ((ev.clientX - box.left) / box.width) * ch.w;
+    const near = panel.dots.reduce((best, d) => (Math.abs(d.cx - ux) < Math.abs(best.cx - ux) ? d : best));
+    const cur = this.hover();
+    if (cur?.personId !== personId || cur.id !== near.id) this.hover.set({ personId, id: near.id });
+  }
+
+  protected leaveChart(ev: PointerEvent) {
+    // On touch the tooltip stays until the next tap, so its button can be pressed.
+    if (ev.pointerType === 'mouse') this.hover.set(null);
+  }
 
   /** Every weigh-in in the chart period, newest first; odd-looking ones are flagged so they're easy to spot. */
   protected readonly entries = computed(() => {
@@ -494,6 +589,49 @@ function median(values: number[]) {
 
 function dayDiff(from: string, to: string) {
   return Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000);
+}
+
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+/** Round axis bounds and 3–6 ticks on a 0,5 / 1 / 2 / 5 / 10 kg step, with a little headroom. */
+function niceScale(min: number, max: number) {
+  const pad = Math.max(0.3, (max - min) * 0.08);
+  const range = Math.max(2, max - min + 2 * pad);
+  const step = [0.5, 1, 2, 5, 10, 20].find((s) => range / s <= 5) ?? 50;
+  const lo = Math.floor((min - pad) / step) * step;
+  const hi = Math.ceil((max + pad) / step) * step;
+  const ticks: number[] = [];
+  for (let v = lo; v <= hi + 1e-9; v += step) ticks.push(Math.round(v * 10) / 10);
+  return { lo, hi, step, ticks };
+}
+
+/** Date ticks that suit the span: every few days, weekly (Mondays), monthly or quarterly. */
+function dateTicks(from: string, to: string): { day: string; label: string }[] {
+  const span = dayDiff(from, to);
+  const dayLabel = (d: string) => `${new Date(d).getUTCDate()} ${fmt.dateOnlyMonthShort(d)}`;
+  const out: { day: string; label: string }[] = [];
+  if (span <= 75) {
+    let day = from;
+    let step = Math.max(1, Math.ceil(span / 6));
+    if (span > 14) {
+      // Align to Mondays so the ticks read as weeks.
+      while (new Date(day).getUTCDay() !== 1) day = addDays(day, 1);
+      step = span > 45 ? 14 : 7;
+    }
+    for (; day <= to; day = addDays(day, step)) out.push({ day, label: dayLabel(day) });
+    return out;
+  }
+  const months = span <= 200 ? 1 : span <= 400 ? 2 : span <= 800 ? 3 : 6;
+  const d = new Date(from);
+  d.setUTCDate(1);
+  d.setUTCMonth(d.getUTCMonth() + 1);
+  while (d.getUTCMonth() % months) d.setUTCMonth(d.getUTCMonth() + 1);
+  for (; d.toISOString().slice(0, 10) <= to; d.setUTCMonth(d.getUTCMonth() + months)) {
+    const day = d.toISOString().slice(0, 10);
+    const label = fmt.dateOnlyMonthShort(day);
+    out.push({ day, label: d.getUTCMonth() === 0 || span > 400 ? `${label} ${String(d.getUTCFullYear()).slice(2)}` : label });
+  }
+  return out;
 }
 
 /** "3 dias", "2 meses", "1 ano" */

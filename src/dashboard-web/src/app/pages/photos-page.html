@@ -1,5 +1,9 @@
 <div class="page-head">
   <h1><app-icon name="image" [size]="26" />Fotos</h1>
+  <div class="views" role="group" aria-label="Visualização">
+    <button type="button" [class.on]="view() === 'grid'" (click)="view.set('grid')"><app-icon name="grid" [size]="16" />Grade</button>
+    <button type="button" [class.on]="view() === 'globe'" (click)="view.set('globe')"><app-icon name="globe" [size]="16" />Globo</button>
+  </div>
 </div>
 
 <section class="upload-panel">
@@ -12,9 +16,21 @@
   <label>Legenda
     <input #captionInput type="text" maxlength="200" placeholder="Opcional, vale para todas as fotos enviadas" />
   </label>
+  <label>País
+    <input #countryInput type="text" maxlength="60" list="countries" placeholder="Ex.: Portugal" />
+    <datalist id="countries">
+      @for (c of countries(); track c) { <option [value]="c"></option> }
+    </datalist>
+  </label>
+  <label>Cidade
+    <input #cityInput type="text" maxlength="80" list="cities" placeholder="Ex.: Porto" />
+    <datalist id="cities">
+      @for (c of cities(); track c) { <option [value]="c"></option> }
+    </datalist>
+  </label>
   <label class="upload-btn" [class.busy]="uploading()">
     <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple [disabled]="uploading()"
-           (change)="upload($event, albumInput, captionInput)" />
+           (change)="upload($event, albumInput, captionInput, countryInput, cityInput)" />
     <app-icon name="upload" [size]="16" />{{ uploading() ? 'Enviando…' : 'Enviar fotos' }}
   </label>
 </section>
@@ -26,29 +42,56 @@
   <p class="muted">Ainda não há fotos: as imagens abaixo são exemplos e somem quando vocês enviarem as primeiras.</p>
 }
 
-<nav class="albums" aria-label="Álbuns">
-  <button type="button" [class.on]="filter() === null" (click)="select(null)">Todas <span class="n">{{ all().length }}</span></button>
-  @for (a of albums(); track a.name) {
-    <button type="button" class="album" [class.on]="filter()?.toLocaleLowerCase() === a.name.toLocaleLowerCase()" (click)="select(a.name)">
-      <img [src]="a.coverUrl" alt="" loading="lazy" />{{ a.name }} <span class="n">{{ a.count }}</span>
-    </button>
-  }
-  @if (albums().length && withoutAlbum()) {
-    <button type="button" [class.on]="filter() === noAlbum" (click)="select(noAlbum)">Sem álbum <span class="n">{{ withoutAlbum() }}</span></button>
-  }
-</nav>
+@if (view() === 'globe') {
+  <p class="muted globe-summary">
+    @if (places().length) {
+      Fotos em {{ placeStats().countries }} {{ placeStats().countries === 1 ? 'país' : 'países' }}@if (placeStats().cities) { e {{ placeStats().cities }} {{ placeStats().cities === 1 ? 'cidade' : 'cidades' }}}.
+      Toque num lugar para ver as fotos.
+    } @else {
+      Nenhuma foto com país ainda. Informe país e cidade ao enviar, ou abra uma foto para completar.
+    }
+    @if (unlocated()) { {{ unlocated() }} {{ unlocated() === 1 ? 'foto tem um lugar que não foi encontrado' : 'fotos têm lugares que não foram encontrados' }} no mapa. }
+  </p>
+  <app-photos-globe [places]="places()" [selected]="place()" (pick)="pickPlace($event)" />
+} @else {
+  <nav class="albums" aria-label="Álbuns">
+    <button type="button" [class.on]="filter() === null && !place()" (click)="select(null)">Todas <span class="n">{{ all().length }}</span></button>
+    @for (a of albums(); track a.name) {
+      <button type="button" class="album" [class.on]="filter()?.toLocaleLowerCase() === a.name.toLocaleLowerCase()" (click)="select(a.name)">
+        <img [src]="a.coverUrl" alt="" loading="lazy" />{{ a.name }} <span class="n">{{ a.count }}</span>
+      </button>
+    }
+    @if (albums().length && withoutAlbum()) {
+      <button type="button" [class.on]="filter() === noAlbum" (click)="select(noAlbum)">Sem álbum <span class="n">{{ withoutAlbum() }}</span></button>
+    }
+  </nav>
+}
+
+@if (place(); as pl) {
+  <div class="place-head">
+    <app-icon name="mapPin" [size]="18" />
+    <strong>{{ placeLabel(pl) }}</strong>
+    <span class="n">{{ photos().length }} {{ photos().length === 1 ? 'foto' : 'fotos' }}</span>
+    <button type="button" (click)="pickPlace(null)" aria-label="Mostrar todas as fotos"><app-icon name="x" [size]="16" /></button>
+  </div>
+}
 
 @if (loading()) {
   <p class="muted">Carregando…</p>
-} @else {
+} @else if (view() === 'grid' || place()) {
   <div class="grid">
     @for (p of photos(); track p.id; let i = $index) {
       <button type="button" class="thumb" (click)="show(i)" [attr.aria-label]="p.caption ?? 'Abrir foto'">
         <img [src]="p.url" alt="" loading="lazy" />
-        @if (p.caption) { <span class="cap">{{ p.caption }}</span> }
+        @if (p.caption || p.country) {
+          <span class="cap">
+            @if (p.caption) { <span>{{ p.caption }}</span> }
+            @if (p.country) { <span class="where"><app-icon name="mapPin" [size]="12" />{{ placeLabel(p) }}</span> }
+          </span>
+        }
       </button>
     } @empty {
-      <p class="muted empty">Nenhuma foto neste álbum ainda. Envie as primeiras acima.</p>
+      <p class="muted empty">{{ place() ? 'Nenhuma foto neste lugar.' : 'Nenhuma foto neste álbum ainda. Envie as primeiras acima.' }}</p>
     }
   </div>
 }
@@ -61,9 +104,13 @@
         <figcaption>
           <input #a type="text" maxlength="60" list="albums" [value]="p.album ?? ''" placeholder="Álbum" aria-label="Álbum" />
           <input #c type="text" maxlength="200" [value]="p.caption ?? ''" placeholder="Legenda" aria-label="Legenda" />
-          <button type="button" class="save" (click)="saveDetails(p, a, c)">Salvar</button>
+          <input #co type="text" maxlength="60" list="countries" [value]="p.country ?? ''" placeholder="País" aria-label="País" />
+          <input #ci type="text" maxlength="80" list="cities" [value]="p.city ?? ''" placeholder="Cidade" aria-label="Cidade" />
+          <button type="button" class="save" (click)="saveDetails(p, a, c, co, ci)">Salvar</button>
           <button type="button" class="delete" (click)="remove(p)" aria-label="Excluir foto"><app-icon name="trash" [size]="16" /></button>
         </figcaption>
+      } @else if (p.country) {
+        <figcaption class="where"><app-icon name="mapPin" [size]="14" />{{ placeLabel(p) }}</figcaption>
       }
     </figure>
     <button type="button" class="nav prev" (click)="$event.stopPropagation(); step(-1)" aria-label="Foto anterior"><app-icon name="chevronLeft" [size]="24" /></button>

@@ -33,8 +33,18 @@ public sealed class MockCommuteProvider(LocalClock clock, IOptions<DashboardOpti
             now.AddMinutes(current),
             curve,
             "Trânsito lento na VCI perto das Antas",
-            now);
+            now,
+            Return: MockReturn(now, hourNow));
 
         return Task.FromResult(estimate);
+    }
+
+    /// <summary>Way home: the evening peak hits this direction harder than the morning one.</summary>
+    private static ReturnTrip MockReturn(DateTimeOffset now, double hour)
+    {
+        var usual = (int)Math.Round(17 + 6 * Math.Exp(-Math.Pow(hour - 8.5, 2) / 1.5) + 13 * Math.Exp(-Math.Pow(hour - 18.25, 2) / 1.8));
+        var current = usual + 1;
+        var traffic = (current - 17) switch { >= 12 => TrafficLevel.Heavy, >= 5 => TrafficLevel.Moderate, _ => TrafficLevel.Light };
+        return new ReturnTrip(current, usual, UsualSource.History, 11.9, "Ponte da Arrábida · A1", traffic, now.AddMinutes(current));
     }
 }

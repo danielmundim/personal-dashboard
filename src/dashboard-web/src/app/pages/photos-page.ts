@@ -6,17 +6,19 @@ import { Photo, PhotoList } from '../core/models';
 import { pollingResource } from '../core/polling-resource';
 import { Icon } from '../shared/icon';
 import { valueOf } from '../shared/resource-state';
+import { PhotosGlobe, PlacePick, placeLabel, samePlace } from './photos-globe';
 
 const NO_ALBUM = '__none__';
 
 /**
- * Fotos: every photo we've uploaded, grouped into albums for moments and trips. Upload straight into
- * an album, filter by album, and open a photo to edit its caption or album, or delete it. The Hoje
- * slideshow uses the same photos.
+ * Fotos: every photo we've uploaded, grouped into albums for moments and trips, each with the
+ * country and city where it was taken. Upload straight into an album and place, filter by album,
+ * or switch to the globe to see where the photos are from and tap a place to open its photos. Open
+ * a photo to edit its details, or delete it. The Hoje slideshow uses the same photos.
  */
 @Component({
   selector: 'app-photos-page',
-  imports: [Icon],
+  imports: [Icon, PhotosGlobe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './photos-page.html',
   styleUrl: './photos-page.scss',
@@ -30,15 +32,32 @@ export class PhotosPage {
   private readonly res = pollingResource<PhotoList>('/api/photos', 5 * MINUTE);
 
   protected readonly noAlbum = NO_ALBUM;
+  protected readonly placeLabel = placeLabel;
   protected readonly loading = computed(() => !this.res.hasValue() && !this.res.error());
   protected readonly all = computed(() => valueOf(this.res)?.photos ?? []);
   protected readonly isSample = computed(() => this.all().some((p) => p.sample));
   protected readonly albums = computed(() => valueOf(this.res)?.albums ?? []);
+  protected readonly places = computed(() => valueOf(this.res)?.places ?? []);
   protected readonly withoutAlbum = computed(() => this.all().filter((p) => !p.album).length);
+
+  /** Typed before, offered as suggestions so "Brasil" doesn't also become "Brazil". */
+  protected readonly countries = computed(() => distinct(this.all().map((p) => p.country)));
+  protected readonly cities = computed(() => distinct(this.all().map((p) => p.city)));
+  protected readonly placeStats = computed(() => {
+    const p = this.places();
+    return { countries: distinct(p.map((x) => x.country)).length, cities: p.filter((x) => x.city).length };
+  });
+  protected readonly unlocated = computed(() => this.all().filter((p) => p.country && p.latitude === null).length);
+
+  protected readonly view = signal<'grid' | 'globe'>('grid');
 
   /** null = all photos; NO_ALBUM = photos without an album; otherwise an album name. */
   protected readonly filter = signal<string | null>(null);
+  /** The place picked on the globe. Album and place filters replace each other, so the grid is never empty by accident. */
+  protected readonly place = signal<PlacePick | null>(null);
   protected readonly photos = computed(() => {
+    const place = this.place();
+    if (place) return this.all().filter((p) => p.country && samePlace(p, place));
     const f = this.filter();
     if (f === null) return this.all();
     if (f === NO_ALBUM) return this.all().filter((p) => !p.album);
@@ -60,8 +79,14 @@ export class PhotosPage {
 
   protected select(filter: string | null) {
     this.filter.set(filter);
+    this.place.set(null);
     this.openIndex.set(null);
     this.router.navigate([], { queryParams: { album: filter && filter !== NO_ALBUM ? filter : null }, replaceUrl: true });
+  }
+
+  protected pickPlace(place: PlacePick | null) {
+    if (place) this.select(null);
+    this.place.set(place);
   }
 
   /** Album to suggest in the upload form: the one being viewed, if any. */
@@ -70,7 +95,7 @@ export class PhotosPage {
     return f && f !== NO_ALBUM ? f : '';
   });
 
-  protected upload(event: Event, albumInput: HTMLInputElement, captionInput: HTMLInputElement) {
+  protected upload(event: Event, albumInput: HTMLInputElement, captionInput: HTMLInputElement, countryInput: HTMLInputElement, cityInput: HTMLInputElement) {
     const input = event.target as HTMLInputElement;
     const files = Array.from(input.files ?? []);
     if (!files.length) return;
@@ -79,6 +104,8 @@ export class PhotosPage {
     const album = albumInput.value.trim();
     if (album) form.append('album', album);
     if (captionInput.value.trim()) form.append('caption', captionInput.value.trim());
+    if (countryInput.value.trim()) form.append('country', countryInput.value.trim());
+    if (cityInput.value.trim()) form.append('city', cityInput.value.trim());
 
     this.uploading.set(true);
     this.error.set(null);
@@ -121,8 +148,8 @@ export class PhotosPage {
     if (e.key === 'ArrowLeft') this.step(-1);
   }
 
-  protected saveDetails(photo: Photo, album: HTMLInputElement, caption: HTMLInputElement) {
-    const body = { album: album.value.trim(), caption: caption.value.trim() };
+  protected saveDetails(photo: Photo, album: HTMLInputElement, caption: HTMLInputElement, country: HTMLInputElement, city: HTMLInputElement) {
+    const body = { album: album.value.trim(), caption: caption.value.trim(), country: country.value.trim(), city: city.value.trim() };
     this.http.patch(`/api/photos/${encodeURIComponent(photo.id)}`, body).subscribe({
       next: () => {
         this.error.set(null);
@@ -142,4 +169,10 @@ export class PhotosPage {
       error: () => this.error.set('Não foi possível excluir a foto.'),
     });
   }
+}
+
+function distinct(values: (string | null)[]): string[] {
+  const seen = new Map<string, string>();
+  for (const v of values) if (v && !seen.has(v.toLocaleLowerCase())) seen.set(v.toLocaleLowerCase(), v);
+  return [...seen.values()].sort((a, b) => a.localeCompare(b, 'pt-BR'));
 }

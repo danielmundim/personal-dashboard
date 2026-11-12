@@ -175,26 +175,84 @@
     </div>
 
     @if (chart(); as ch) {
-      <svg class="chart" [attr.viewBox]="'0 0 ' + ch.w + ' ' + ch.h" role="img" aria-label="Peso ao longo do tempo, com a média de 7 dias e a meta">
-        @for (t of ch.ticks; track t.label) {
-          <line [attr.x1]="ch.left" [attr.x2]="ch.right" [attr.y1]="t.y" [attr.y2]="t.y" class="grid" />
-          <text [attr.x]="ch.left - 6" [attr.y]="t.y + 4" class="axis" text-anchor="end">{{ t.label }}</text>
+      <div class="charts">
+        @for (c of ch.panels; track c.person.id) {
+          <div class="chart-panel" [style.--tone]="c.color">
+            <p class="chart-head small">
+              <span class="dot"></span><b>{{ c.person.name }}</b>
+              @if (c.change) { <span class="change" [class.good]="c.changeDown">{{ c.change }}</span> <span class="muted">{{ c.changeSpan }} (média de 7 dias)</span> }
+            </p>
+            <div class="chart-wrap" (pointerleave)="leaveChart($event)">
+              <svg class="chart" [attr.viewBox]="'0 0 ' + ch.w + ' ' + ch.h" role="img"
+                   [attr.aria-label]="'Peso de ' + c.person.name + ' ao longo do tempo, com a média de 7 dias e a meta'"
+                   (pointermove)="pointAt($event, c.person.id)" (pointerdown)="pointAt($event, c.person.id)">
+                <defs>
+                  <linearGradient [attr.id]="ch.gradient + c.person.id" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0" [attr.stop-color]="c.color" stop-opacity="0.22" />
+                    <stop offset="1" [attr.stop-color]="c.color" stop-opacity="0" />
+                  </linearGradient>
+                </defs>
+                <rect [attr.x]="ch.left" [attr.y]="ch.top" [attr.width]="ch.right - ch.left" [attr.height]="ch.bottom - ch.top" class="hit" />
+
+                @for (t of c.yTicks; track t.label) {
+                  <line [attr.x1]="ch.left" [attr.x2]="ch.right" [attr.y1]="t.y" [attr.y2]="t.y" class="grid" />
+                  <text [attr.x]="ch.left - 8" [attr.y]="t.y + 4" class="axis" text-anchor="end">{{ t.label }}</text>
+                }
+                @for (t of ch.xTicks; track t.day) {
+                  <line [attr.x1]="t.x" [attr.x2]="t.x" [attr.y1]="ch.top" [attr.y2]="ch.bottom" class="grid v" />
+                  <text [attr.x]="t.x" [attr.y]="ch.h - 7" class="axis" text-anchor="middle">{{ t.label }}</text>
+                }
+                <line [attr.x1]="ch.left" [attr.x2]="ch.right" [attr.y1]="ch.bottom" [attr.y2]="ch.bottom" class="baseline" />
+
+                @if (c.goal; as g) {
+                  @if (g.y !== null) {
+                    <line [attr.x1]="ch.left" [attr.x2]="ch.right" [attr.y1]="g.y" [attr.y2]="g.y" class="goal" />
+                  }
+                  <text [attr.x]="ch.right + 6" [attr.y]="g.ty" class="goal-label">{{ g.label }}</text>
+                }
+
+                @if (c.area) { <path [attr.d]="c.area" class="area" [attr.fill]="'url(#' + ch.gradient + c.person.id + ')'" /> }
+                @for (p of c.dots; track p.id) {
+                  <circle [attr.cx]="p.cx" [attr.cy]="p.cy" [attr.r]="p.odd ? 4 : ch.many ? 1.8 : 2.6" class="reading" [class.odd]="p.odd" [class.few]="!c.line" />
+                }
+                @if (c.line) { <path [attr.d]="c.line" class="trend" /> }
+
+                @if (c.max; as m) { <text [attr.x]="m.tx" [attr.y]="m.ty" class="extreme" [attr.text-anchor]="m.anchor">{{ m.label }}</text> }
+                @if (c.min; as m) { <text [attr.x]="m.tx" [attr.y]="m.ty" class="extreme" [attr.text-anchor]="m.anchor">{{ m.label }}</text> }
+
+                <circle [attr.cx]="c.last.cx" [attr.cy]="c.last.cy" r="4.5" class="latest" />
+                <text [attr.x]="ch.right + 6" [attr.y]="c.end.y" class="end-label">{{ c.end.label }}</text>
+
+                @if (tip(); as t) {
+                  @if (t.personId === c.person.id) {
+                    <line [attr.x1]="t.dot.cx" [attr.x2]="t.dot.cx" [attr.y1]="ch.top" [attr.y2]="ch.bottom" class="cross" />
+                    @if (c.line) { <circle [attr.cx]="t.dot.cx" [attr.cy]="t.dot.ay" r="3.5" class="cross-avg" /> }
+                    <circle [attr.cx]="t.dot.cx" [attr.cy]="t.dot.cy" r="5" class="cross-dot" />
+                  }
+                }
+              </svg>
+
+              @if (tip(); as t) {
+                @if (t.personId === c.person.id) {
+                  <div class="tip" [attr.data-align]="t.align" [class.below]="t.below" [style.left.%]="t.left" [style.top.%]="t.top" role="status">
+                    <span class="muted">{{ t.when }}</span>
+                    <b class="num">{{ t.kg }} kg</b>
+                    @if (c.line) { <span class="muted">média 7 dias {{ t.avg }} kg</span> }
+                    @if (t.dot.odd) { <span class="warn">fora do padrão da semana</span> }
+                    <button type="button" class="link" (click)="focusEntry(t.dot.id)">Ver registro</button>
+                  </div>
+                }
+              }
+            </div>
+          </div>
         }
-        @for (d of ch.dates; track $index) {
-          <text [attr.x]="d.x" [attr.y]="ch.h - 6" class="axis" [attr.text-anchor]="$first ? 'start' : $last ? 'end' : 'middle'">{{ d.label }}</text>
-        }
-        @for (s of ch.series; track s.person.id) {
-          @if (s.goalY !== null) {
-            <line [attr.x1]="ch.left" [attr.x2]="ch.right" [attr.y1]="s.goalY" [attr.y2]="s.goalY" class="goal" [style.stroke]="s.color" />
-          }
-          @for (p of s.dots; track $index) {
-            <circle [attr.cx]="p.cx" [attr.cy]="p.cy" [attr.r]="p.odd ? 4 : 2.2" class="reading" [class.odd]="p.odd" [style.fill]="s.color"
-                    (click)="focusEntry(p.id)"><title>{{ p.title }}</title></circle>
-          }
-          <polyline [attr.points]="s.trend" class="trend" [style.stroke]="s.color" />
-        }
-      </svg>
-      <p class="muted small legend">Pontos: pesagens do dia (toque para achar o registro) · linha: média de 7 dias · tracejado: meta</p>
+      </div>
+      <p class="muted small legend">
+        <span class="key dots"></span>pesagens
+        <span class="key line"></span>média de 7 dias
+        <span class="key dash"></span>meta
+        · toque no gráfico para ver cada pesagem
+      </p>
     }
 
     <form class="weight-form" #wf (submit)="saveWeight($event, wf)">

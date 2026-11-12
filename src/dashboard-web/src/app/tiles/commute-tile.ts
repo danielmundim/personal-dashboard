@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { DecimalPipe } from '@angular/common';
 import { Clock, fmt } from '../core/clock';
 import { DashboardData } from '../core/dashboard-data';
+import { ReturnTrip } from '../core/models';
 import { Icon } from '../shared/icon';
 import { Tile } from '../shared/tile';
 import { tileState, valueOf } from '../shared/resource-state';
@@ -9,7 +10,7 @@ import { tileState, valueOf } from '../shared/resource-state';
 const W = 300;
 const H = 64;
 
-/** Live drive time (Waze) to a fixed destination, against the usual time for this hour. */
+/** Live drive time to a fixed destination and back home, each against the usual time for this hour. */
 @Component({
   selector: 'app-commute-tile',
   imports: [Tile, Icon, DecimalPipe],
@@ -30,6 +31,20 @@ const H = 64;
           <div><dt>Distância</dt><dd class="num">{{ e.distanceKm | number: '1.1-1' }} km</dd></div>
           <div class="via"><dt>Via</dt><dd>{{ e.via }}</dd></div>
         </dl>
+        @if (e.return; as r) {
+          <section class="back" aria-label="Volta para casa">
+            <div class="back-head">
+              <app-icon name="home" [size]="14" /><span>Volta para casa</span>
+              <span class="chip" [attr.data-tone]="tones[r.traffic]">{{ trafficLabels[r.traffic] }}</span>
+            </div>
+            <div class="back-row">
+              <strong class="num">{{ r.currentMinutes }}</strong><span class="unit">min</span>
+              <span class="back-delta" [class.worse]="r.currentMinutes > r.usualMinutes">{{ deltaText(r) }}</span>
+              <span class="back-arrival muted">chegada <b class="num">{{ arrivalAfter(r.currentMinutes) }}</b></span>
+            </div>
+            <small class="muted back-via">{{ r.via }} · {{ r.distanceKm | number: '1.1-1' }} km</small>
+          </section>
+        }
         @if (e.incident) {
           <p class="incident"><app-icon name="alert" [size]="14" />{{ e.incident }}</p>
         }
@@ -62,6 +77,16 @@ const H = 64;
     dl div { display: flex; flex-direction: column; padding: 6px 10px; border-radius: 10px; background: var(--surface-2); min-width: 0; }
     dt { font-size: 0.68rem; color: var(--text-faint); }
     dd { margin: 0; font-weight: 600; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .back { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); }
+    .back-head { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: var(--text-faint); font-weight: 500; }
+    .back-head .chip { margin-left: auto; }
+    .back-row { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+    .back-row strong { font-size: 1.6rem; font-weight: 600; line-height: 1; letter-spacing: -0.02em; }
+    .back-row .unit { color: var(--text-faint); font-weight: 500; }
+    .back-delta { font-size: 0.8rem; color: var(--green); font-weight: 500; }
+    .back-delta.worse { color: var(--amber); }
+    .back-arrival { margin-left: auto; font-size: 0.78rem; }
+    .back-via { font-size: 0.72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .incident { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 0.8rem; color: var(--amber); }
     svg { width: 100%; height: auto; overflow: visible; }
     .area { fill: color-mix(in srgb, var(--teal) 14%, transparent); }
@@ -87,8 +112,23 @@ export class CommuteTile {
   /** Leaving now: the reading can be up to 10 min old, so add its duration to the current time, not the request time. */
   protected readonly arrival = computed(() => {
     const e = this.e();
-    return e ? fmt.time(new Date(this.clock.now().getTime() + e.currentMinutes * 60_000)) : '';
+    return e ? this.arrivalAfter(e.currentMinutes) : '';
   });
+
+  protected arrivalAfter(minutes: number): string {
+    return fmt.time(new Date(this.clock.now().getTime() + minutes * 60_000));
+  }
+
+  protected readonly trafficLabels = { light: 'Trânsito leve', moderate: 'Trânsito moderado', heavy: 'Trânsito intenso' } as const;
+  protected readonly tones = { light: 'green', moderate: 'amber', heavy: 'rose' } as const;
+
+  protected deltaText(r: ReturnTrip): string {
+    const d = r.currentMinutes - r.usualMinutes;
+    const base = r.usualSource === 'freeFlow' ? 'sem trânsito' : 'o normal';
+    if (d > 0) return `${d} min a mais que ${base}`;
+    if (d < 0) return `${-d} min a menos que ${base}`;
+    return r.usualSource === 'freeFlow' ? 'igual a sem trânsito' : 'igual ao normal';
+  }
 
   protected readonly baseline = computed(() => (this.e()?.usualSource === 'freeFlow' ? 'sem trânsito' : 'o normal'));
 
@@ -97,11 +137,9 @@ export class CommuteTile {
     return e ? e.currentMinutes - e.usualMinutes : 0;
   });
 
-  protected readonly trafficLabel = computed(
-    () => ({ light: 'Trânsito leve', moderate: 'Trânsito moderado', heavy: 'Trânsito intenso' })[this.e()?.traffic ?? 'light'],
-  );
+  protected readonly trafficLabel = computed(() => this.trafficLabels[this.e()?.traffic ?? 'light']);
 
-  protected readonly tone = computed(() => ({ light: 'green', moderate: 'amber', heavy: 'rose' })[this.e()?.traffic ?? 'light']);
+  protected readonly tone = computed(() => this.tones[this.e()?.traffic ?? 'light']);
 
   protected readonly curve = computed(() => {
     const pts = this.e()?.today ?? [];

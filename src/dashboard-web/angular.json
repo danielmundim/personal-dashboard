@@ -24,10 +24,16 @@
             "browser": "src/main.ts",
             "tsConfig": "tsconfig.app.json",
             "inlineStyleLanguage": "scss",
+            "allowedCommonJsDependencies": ["frame-ticker"],
             "assets": [
               {
                 "glob": "**/*",
                 "input": "public"
+              },
+              {
+                "glob": "countries-50m.json",
+                "input": "node_modules/world-atlas",
+                "output": "geo"
               }
             ],
             "styles": [

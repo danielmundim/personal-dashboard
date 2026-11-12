@@ -10,6 +10,7 @@
   }
 </div>
 
+<div class="toolbar">
 @if (people().length) {
   <div class="readers" role="tablist" aria-label="Quem está lendo">
     <button type="button" role="tab" [class.on]="!reader()" [attr.aria-selected]="!reader()" (click)="showReader(null)">Todos</button>
@@ -21,6 +22,11 @@
     }
   </div>
 }
+  <div class="readers seg" role="group" aria-label="Como mostrar os livros">
+    <button type="button" [class.on]="layout() === 'estantes'" [attr.aria-pressed]="layout() === 'estantes'" (click)="setLayout('estantes')">Estantes</button>
+    <button type="button" [class.on]="layout() === 'lista'" [attr.aria-pressed]="layout() === 'lista'" (click)="setLayout('lista')">Lista</button>
+  </div>
+</div>
 
 @if (error()) {
   <p class="error">{{ error() }}</p>
@@ -59,6 +65,12 @@
     </label>
     <label class="wide"><span>Autor <span class="opt">opcional</span></span>
       <input name="author" maxlength="120" [value]="b?.author ?? ''" />
+    </label>
+    <label class="wide"><span>Categoria <span class="opt">a estante onde ele fica</span></span>
+      <input name="category" maxlength="40" list="book-categories" autocomplete="off" [value]="b?.category ?? ''" placeholder="Ex.: Fantasia" />
+      <datalist id="book-categories">
+        @for (c of categories(); track c) { <option [value]="c"></option> }
+      </datalist>
     </label>
     <label>Situação
       <select name="status">
@@ -180,35 +192,94 @@
   }
 </section>
 
+<!-- A queued, read or dropped book as one line: cover, title and details, then what can be done with it. -->
+<ng-template #bookLine let-b>
+  <span class="thumb" aria-hidden="true">@if (b.cover) { <img [src]="b.cover" alt="" loading="lazy" /> } @else { {{ b.title.charAt(0) }} }</span>
+  <span class="what">
+    <strong>{{ b.title }}@if (b.took) { <span class="took num" [title]="'Lido em ' + b.took">{{ b.took }}</span> }</strong>
+    <small class="muted">
+      {{ b.author ?? 'Autor desconhecido' }}@if (b.status === 'queroLer') { · {{ b.formatLabel }}@if (b.totalPages) { · {{ b.totalPages }} pág. } }@if (layout() === 'lista' && b.category) { · {{ b.category }} }@if (b.readerChip; as r) { · <span class="who" [attr.data-tone]="r.color">{{ r.name }}</span> }@if (b.finished) { · {{ b.status === 'abandonado' ? 'parou em' : 'terminado em' }} {{ b.finished }} }
+      @if (b.status === 'abandonado') { · <span class="tag">Abandonado@if (b.progress) { em {{ b.progress.pct }}% }</span> }
+    </small>
+    @if (b.notes) { <small class="notes-line">{{ b.notes }}</small> }
+  </span>
+  <span class="row-tools">
+    @switch (b.status) {
+      @case ('queroLer') {
+        <button type="button" class="ghost small" (click)="start(b)"><app-icon name="book" [size]="14" />Começar</button>
+      }
+      @case ('lido') {
+        <span class="stars" role="radiogroup" [attr.aria-label]="'Nota de ' + b.title">
+          @for (n of stars; track n) {
+            <button type="button" class="star" [class.on]="(b.rating ?? 0) >= n" (click)="rate(b, n)"
+                    role="radio" [attr.aria-checked]="b.rating === n" [attr.aria-label]="n + (n === 1 ? ' estrela' : ' estrelas')">
+              <app-icon name="star" [size]="16" />
+            </button>
+          }
+        </span>
+      }
+      @default {
+        <button type="button" class="ghost small" (click)="start(b)">Retomar</button>
+      }
+    }
+    <button type="button" class="icon" (click)="open(b.id)" [attr.aria-label]="'Editar ' + b.title"><app-icon name="pencil" [size]="15" /></button>
+  </span>
+</ng-template>
+
+<!-- Shelves by category: covers standing side by side; the tapped one opens its line underneath. -->
+<ng-template #shelvesView let-shelves>
+  <div class="shelves">
+    @for (sh of shelves; track sh.name) {
+      <div class="shelf card">
+        <h4>{{ sh.name }} <span class="muted num">· {{ sh.books.length }}</span></h4>
+        <div class="shelf-row" role="list">
+          @for (b of sh.books; track b.id) {
+            <button type="button" role="listitem" class="spine" [class.on]="selected() === b.id" [class.dropped]="b.status === 'abandonado'"
+                    [attr.aria-pressed]="selected() === b.id" [attr.aria-label]="b.title + (b.author ? ', ' + b.author : '') + (b.took ? ', lido em ' + b.took : '')" [title]="b.title"
+                    (click)="select(b.id)">
+              @if (b.cover) {
+                <img [src]="b.cover" alt="" loading="lazy" />
+              } @else {
+                <span class="plain"><b>{{ b.title }}</b>@if (b.author) { <small>{{ b.author }}</small> }</span>
+              }
+              @if (b.status === 'lido' && b.rating) { <span class="badge num">{{ b.rating }}★</span> }
+              @if (b.took) { <span class="badge took-badge num" aria-hidden="true">{{ b.took }}</span> }
+              @if (b.readerChip; as r) { <span class="owner" [attr.data-tone]="r.color" aria-hidden="true"></span> }
+            </button>
+          }
+        </div>
+        @if (sh.selected; as b) {
+          @if (editing() === b.id) {
+            <ng-container *ngTemplateOutlet="bookForm" />
+          } @else {
+            <ul class="list detail"><li [class.dropped]="b.status === 'abandonado'"><ng-container *ngTemplateOutlet="bookLine; context: { $implicit: b }" /></li></ul>
+          }
+        }
+      </div>
+    }
+  </div>
+</ng-template>
+
 <!-- ---------- Quero ler ---------- -->
 <section class="block">
   <div class="block-head">
     <h3>Quero ler @if (queue().length) { <span class="num">({{ queue().length }})</span> }</h3>
     <button type="button" class="ghost small" (click)="newBook('queroLer')"><app-icon name="plus" [size]="14" />Adicionar à lista</button>
   </div>
-  @if (queue().length) {
+  @if (!queue().length) {
+    <p class="muted small">Anote aqui os livros que alguém recomendou ou que você quer comprar.</p>
+  } @else if (layout() === 'estantes') {
+    <ng-container *ngTemplateOutlet="shelvesView; context: { $implicit: queueShelves() }" />
+  } @else {
     <ul class="list card">
       @for (b of queue(); track b.id) {
         @if (editing() === b.id) {
           <li class="editing"><ng-container *ngTemplateOutlet="bookForm" /></li>
         } @else {
-          <li>
-            <span class="thumb" aria-hidden="true">@if (b.cover) { <img [src]="b.cover" alt="" loading="lazy" /> } @else { {{ b.title.charAt(0) }} }</span>
-            <span class="what">
-              <strong>{{ b.title }}</strong>
-              <small class="muted">{{ b.author ?? 'Autor desconhecido' }} · {{ b.formatLabel }}@if (b.totalPages) { · {{ b.totalPages }} pág. }@if (b.readerChip; as r) { · <span class="who" [attr.data-tone]="r.color">{{ r.name }}</span> }</small>
-              @if (b.notes) { <small class="notes-line">{{ b.notes }}</small> }
-            </span>
-            <span class="row-tools">
-              <button type="button" class="ghost small" (click)="start(b)"><app-icon name="book" [size]="14" />Começar</button>
-              <button type="button" class="icon" (click)="open(b.id)" [attr.aria-label]="'Editar ' + b.title"><app-icon name="pencil" [size]="15" /></button>
-            </span>
-          </li>
+          <li><ng-container *ngTemplateOutlet="bookLine; context: { $implicit: b }" /></li>
         }
       }
     </ul>
-  } @else {
-    <p class="muted small">Anote aqui os livros que alguém recomendou ou que você quer comprar.</p>
   }
 </section>
 
@@ -221,42 +292,21 @@
       </button>
     </div>
     @if (showFinished()) {
-      @for (g of finishedByYear(); track g.year) {
-        <h4>{{ g.year }} <span class="muted num">· {{ g.books.length }}</span></h4>
-        <ul class="list card">
-          @for (b of g.books; track b.id) {
-            @if (editing() === b.id) {
-              <li class="editing"><ng-container *ngTemplateOutlet="bookForm" /></li>
-            } @else {
-              <li [class.dropped]="b.status === 'abandonado'">
-                <span class="thumb" aria-hidden="true">@if (b.cover) { <img [src]="b.cover" alt="" loading="lazy" /> } @else { {{ b.title.charAt(0) }} }</span>
-                <span class="what">
-                  <strong>{{ b.title }}</strong>
-                  <small class="muted">
-                    {{ b.author ?? 'Autor desconhecido' }}@if (b.readerChip; as r) { · <span class="who" [attr.data-tone]="r.color">{{ r.name }}</span> }@if (b.finished) { · {{ b.status === 'abandonado' ? 'parou em' : 'terminado em' }} {{ b.finished }} }
-                    @if (b.status === 'abandonado') { · <span class="tag">Abandonado@if (b.progress) { em {{ b.progress.pct }}% }</span> }
-                  </small>
-                  @if (b.notes) { <small class="notes-line">{{ b.notes }}</small> }
-                </span>
-                <span class="row-tools">
-                  @if (b.status === 'lido') {
-                    <span class="stars" role="radiogroup" [attr.aria-label]="'Nota de ' + b.title">
-                      @for (n of stars; track n) {
-                        <button type="button" class="star" [class.on]="(b.rating ?? 0) >= n" (click)="rate(b, n)"
-                                role="radio" [attr.aria-checked]="b.rating === n" [attr.aria-label]="n + (n === 1 ? ' estrela' : ' estrelas')">
-                          <app-icon name="star" [size]="16" />
-                        </button>
-                      }
-                    </span>
-                  } @else {
-                    <button type="button" class="ghost small" (click)="start(b)">Retomar</button>
-                  }
-                  <button type="button" class="icon" (click)="open(b.id)" [attr.aria-label]="'Editar ' + b.title"><app-icon name="pencil" [size]="15" /></button>
-                </span>
-              </li>
+      @if (layout() === 'estantes') {
+        <ng-container *ngTemplateOutlet="shelvesView; context: { $implicit: finishedShelves() }" />
+      } @else {
+        @for (g of finishedByYear(); track g.year) {
+          <h4>{{ g.year }} <span class="muted num">· {{ g.books.length }}</span></h4>
+          <ul class="list card">
+            @for (b of g.books; track b.id) {
+              @if (editing() === b.id) {
+                <li class="editing"><ng-container *ngTemplateOutlet="bookForm" /></li>
+              } @else {
+                <li [class.dropped]="b.status === 'abandonado'"><ng-container *ngTemplateOutlet="bookLine; context: { $implicit: b }" /></li>
+              }
             }
-          }
-        </ul>
+          </ul>
+        }
       }
     }
   </section>

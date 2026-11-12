@@ -25,6 +25,8 @@ public enum BookFormat
 /// before readers existed; those show on everyone's shelf until edited. Two people reading the same
 /// book add it twice: the bookmark is personal.
 /// <see cref="HasCover"/> is true once the cover was downloaded for <see cref="Isbn"/> (see BookCovers).
+/// <see cref="Category"/> is free text ("Fantasia", "História do Brasil"): it picks the shelf the book
+/// stands on in the Estantes view. Null puts it on "Sem categoria".
 /// </summary>
 public sealed record Book(
     Guid Id,
@@ -41,7 +43,8 @@ public sealed record Book(
     DateTimeOffset CreatedAt,
     string? ReaderId = null,
     string? Isbn = null,
-    bool HasCover = false);
+    bool HasCover = false,
+    string? Category = null);
 
 /// <summary>
 /// The shelf split the way the Leituras tab shows it: reading now (most recently started first), the
@@ -65,7 +68,8 @@ public sealed record SaveBook(
     int? Rating,
     string? Notes,
     string? ReaderId = null,
-    string? Isbn = null);
+    string? Isbn = null,
+    string? Category = null);
 
 /// <summary>Moves the bookmark; reaching the last page doesn't finish the book by itself.</summary>
 public sealed record UpdateProgress(int CurrentPage);

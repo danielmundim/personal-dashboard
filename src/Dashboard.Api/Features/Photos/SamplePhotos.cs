@@ -3,7 +3,13 @@ namespace Dashboard.Api.Features.Photos;
 /// <summary>Simple generated SVG scenes shown until real photos are uploaded.</summary>
 public static class SamplePhotos
 {
-    public static readonly string[] Names = ["ribeira-dusk.svg", "atlantic-morning.svg", "douro-hills.svg"];
+    /// <summary>The samples carry places too, so the globe has pins to show before the first upload.</summary>
+    public static IEnumerable<Photo> All =>
+    [
+        Sample("ribeira-dusk.svg", "Portugal", "Porto", 41.1485, -8.61097),
+        Sample("atlantic-morning.svg", "Brasil", "Rio de Janeiro", -22.90642, -43.18223),
+        Sample("douro-hills.svg", "Portugal", "Peso da Régua", 41.16399, -7.78867),
+    ];
 
     public static string? Get(string name) => name switch
     {
@@ -12,6 +18,9 @@ public static class SamplePhotos
         "douro-hills.svg" => Scene("#5b8c5a", "#cfe3a8", "#fff1c1", "#3d5a3a"),
         _ => null,
     };
+
+    private static Photo Sample(string name, string country, string city, double lat, double lon) =>
+        new(name, $"/api/photos/samples/{name}", true, DateTimeOffset.MinValue, Country: country, City: city, Latitude: lat, Longitude: lon);
 
     private static string Scene(string top, string bottom, string sun, string land) => $"""
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice">

@@ -79,9 +79,14 @@ public sealed class NoonaAppointmentProvider(HttpClient http, NoonaAuth auth, Lo
             ? mins
             : DateTimeOffset.TryParse(Str(e, "ends_at"), out var end) ? (int)(end - start).TotalMinutes : 30;
 
-        var checkedIn = e.TryGetProperty("check_in_at", out var ci) && ci.ValueKind is JsonValueKind.Number or JsonValueKind.String;
+        // Noona can carry check_in_at on bookings days ahead (pre-arrival / online check-in), so it only
+        // means "being served now" when the slot is about to start; otherwise trust the clock alone.
+        var finish = start.AddMinutes(duration);
+        var inProgress = start <= now && now < finish;
+        var checkedIn = e.TryGetProperty("check_in_at", out var ci) && (ci.ValueKind is JsonValueKind.Number or JsonValueKind.String)
+            && start - now <= TimeSpan.FromHours(1) && now < finish;
         var unconfirmed = e.TryGetProperty("unconfirmed", out var u) && u.ValueKind == JsonValueKind.True;
-        var status = checkedIn || (start <= now && now < start.AddMinutes(duration))
+        var status = checkedIn || inProgress
             ? AppointmentStatus.CheckedIn
             : unconfirmed ? AppointmentStatus.Unconfirmed : AppointmentStatus.Confirmed;
 
